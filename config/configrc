@@ -1,0 +1,23 @@
+# SimpleWay Config
+
+#output = X11-1:1366x768+0+0
+output = X11-1:800x600+0+0
+
+n_tags = 5
+tag_names = One;Two;Three;Four;Five
+
+border_width = 3
+moveresize_step = 10
+
+background_colour = #222222
+
+border_colour_focus = #1793D0
+border_colour_unfocus = #333333 
+border_colour_urgent = #FF0000 
+border_colour_marked = #00FF00 
+border_colour_fixed = #0000FF
+
+#--- Key Bindings -----
+KEY = A+q QUIT 0
+KEY = S+A+Return SPAWN st
+
