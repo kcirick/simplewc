@@ -3,7 +3,7 @@
 #include <sys/wait.h>
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_box.h>
-//#include <wlr/util/log.h>
+#include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "globals.h"
@@ -58,8 +58,6 @@ void sigchld(int unused) {
 int main(int argc, char **argv) {
    char config_file[64] = { '\0' };
 
-   //wlr_log_init(WLR_DEBUG, NULL);
-
    // Parse arguments
    for(int i=1; i<argc; i++){
       char* iarg = argv[i];
@@ -81,6 +79,8 @@ int main(int argc, char **argv) {
    
    if(config_file[0]=='\0')
       sprintf(config_file, "%s/%s", getenv("HOME"), ".config/simpleway/configrc");
+
+   if(debug) wlr_log_init(WLR_DEBUG, NULL);
 
    struct simple_config g_config = { 0 };
    readConfiguration(&g_config, config_file);

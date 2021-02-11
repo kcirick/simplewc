@@ -11,11 +11,13 @@ MY_LFLAGS = $(LDFLAGS) -lwayland-server -lxkbcommon\
 WL_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wayland-protocols)
 WL_SCANNER=$(shell pkg-config --variable=wayland_scanner wayland-scanner)
 
-SOURCES = action.c config.c layer.c main.c seat.c server.c xdg.c xwayland.c \
-   wlr-layer-shell-unstable-v1-protocol.c xdg-shell-protocol.c
-HEADERS = action.h globals.h layer.h seat.h server.h xdg.h xwayland.h \
+SOURCES = src/action.c src/config.c src/layer.c src/seat.c src/server.c \
+   src/xdg.c src/xwayland.c \
+   wlr-layer-shell-unstable-v1-protocol.c xdg-shell-protocol.c main.c
+HEADERS = include/action.h include/globals.h include/layer.h include/seat.h include/server.h \
+   include/xdg.h include/xwayland.h \
    wlr-layer-shell-unstable-v1-protocol.h xdg-shell-protocol.h
-OBJECTS = $(SOURCES:.c=.o)
+OBJECTS = $(addprefix obj/, $(notdir $(SOURCES:.c=.o)))
 
 CRED     = "\\033[31m"
 CGREEN   = "\\033[32m"
@@ -42,13 +44,17 @@ xdg-shell-protocol.c: xdg-shell-protocol.h
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] $< -> $@"
 	@$(WL_SCANNER) private-code $(WL_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
 
-%.o: %.c
+obj/%.o: %.c
 	@echo -e " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
-	@$(CC) $(MY_CFLAGS) -I. -o $@ -c $<
+	@$(CC) $(MY_CFLAGS) -I. -Iinclude -o $@ -c $<
+
+obj/%.o: src/%.c 
+	@echo -e " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
+	@$(CC) $(MY_CFLAGS) -I. -Iinclude -o $@ -c $<
 
 $(OBJECTS): $(HEADERS)
 
-$(TARGET): $(OBJECTS) 
+$(TARGET): $(OBJECTS) $(SOURCES) 
 	@echo -e " [ $(CPURPLE)LD$(CRESET) ] $(TARGET)"
 	@$(CC) -o $@ $(OBJECTS) $(MY_LFLAGS)
 
