@@ -6,8 +6,10 @@
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_seat.h>
+#include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/xwayland.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "globals.h"
@@ -30,22 +32,22 @@
 static void kb_modifiers_notify(struct wl_listener *listener, void *data) {
    struct simple_input *keyboard = wl_container_of(listener, keyboard, kb_modifiers);
 
-   wlr_seat_set_keyboard(keyboard->seat->seat, keyboard->device);
-   wlr_seat_keyboard_notify_modifiers(keyboard->seat->seat, &keyboard->device->keyboard->modifiers);
+   wlr_seat_set_keyboard(keyboard->seat->seat, keyboard->keyboard);
+   wlr_seat_keyboard_notify_modifiers(keyboard->seat->seat, &keyboard->keyboard->modifiers);
 }
 
 static void kb_key_notify(struct wl_listener *listener, void *data) {
    struct simple_input *keyboard = wl_container_of(listener, keyboard, kb_key);
    struct simple_server *server = keyboard->seat->server;
-   struct wlr_event_keyboard_key *event = data;
+   struct wlr_keyboard_key_event *event = data;
    struct wlr_seat *wlr_seat = keyboard->seat->seat;
 
    uint32_t keycode = event->keycode + 8;
    const xkb_keysym_t *syms;
-   int nsyms = xkb_state_key_get_syms(keyboard->device->keyboard->xkb_state, keycode, &syms);
+   int nsyms = xkb_state_key_get_syms(keyboard->keyboard->xkb_state, keycode, &syms);
    
    bool handled = false;
-   uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->device->keyboard);
+   uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->keyboard);
 
    if(event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
       for(int i=0; i<nsyms; i++){
@@ -62,7 +64,7 @@ static void kb_key_notify(struct wl_listener *listener, void *data) {
    }
 
    if(!handled) {
-      wlr_seat_set_keyboard(wlr_seat, keyboard->device);
+      wlr_seat_set_keyboard(wlr_seat, keyboard->keyboard);
       wlr_seat_keyboard_notify_key(wlr_seat, event->time_msec, event->keycode, event->state);
    }
 }
@@ -71,18 +73,68 @@ static void kb_key_notify(struct wl_listener *listener, void *data) {
 static uint32_t get_resize_edges(struct simple_view *view, double x, double y) {
    uint32_t edges = 0;
 
+   struct wlr_box box = view->current;
+   edges |= x < (box.x + box.width/2)  ? WLR_EDGE_LEFT : WLR_EDGE_RIGHT;
+   edges |= y < (box.y + box.height/2) ? WLR_EDGE_TOP : WLR_EDGE_BOTTOM;
    return edges;
 }
 
 static void process_cursor_move(struct simple_server *server, uint32_t time) {
-   server->grabbed_view->x = server->seat->cursor->x - server->grab_x;
-   server->grabbed_view->y = server->seat->cursor->y - server->grab_y;
+   struct simple_view *view = server->grabbed_view;
+   view->current.x = server->seat->cursor->x - server->grab_x;
+   view->current.y = server->seat->cursor->y - server->grab_y;
+   wlr_scene_node_set_position(&view->scene_tree->node, view->current.x, view->current.y);
 }
 
 static void process_cursor_resize(struct simple_server *server, uint32_t time) {
+   struct simple_view *view = server->grabbed_view;
+   
+   double delta_x = server->seat->cursor->x - server->grab_x;
+   double delta_y = server->seat->cursor->y - server->grab_y;
+   int new_left = server->grab_box.x;
+   int new_right = server->grab_box.x + server->grab_box.width;
+   int new_top = server->grab_box.y;
+   int new_bottom = server->grab_box.y + server->grab_box.height;
+   
+   if (server->resize_edges & WLR_EDGE_TOP) {
+      new_top += delta_y;
+      if(new_top >= new_bottom)
+         new_top = new_bottom - 1;
+   } else if (server->resize_edges & WLR_EDGE_BOTTOM) {
+      new_bottom += delta_y;
+      if(new_bottom <= new_top)
+         new_bottom = new_top + 1;
+   }
+   
+   if (server->resize_edges & WLR_EDGE_LEFT) {
+      new_left += delta_x;
+      if(new_left >= new_right)
+         new_left = new_right - 1;
+   } else if (server->resize_edges & WLR_EDGE_RIGHT) {
+      new_right += delta_x;
+      if(new_right <= new_left)
+         new_right = new_left + 1;
+   }
+
+   view->current.x = new_left;
+   view->current.y = new_top;
+   view->current.width = new_right - new_left;
+   view->current.height = new_bottom - new_top;
+
+   wlr_scene_node_set_position(&view->scene_tree->node, view->current.x, view->current.y);
+   if(view->type==XDG_SHELL_VIEW){
+      wlr_xdg_toplevel_set_size(view->xdg_toplevel, view->current.width, view->current.height);
+#if XWAYLAND
+   } else {
+      wlr_xwayland_surface_configure(view->xwayland_surface,
+            view->current.x, view->current.y, view->current.width, view->current.height);
+#endif
+   }
+
 }
 
 static void process_cursor_motion(struct simple_server *server, uint32_t time) {
+   //say(DEBUG, "process_cursor_motion");
    if(server->cmode == CURSOR_MOVE) {
       process_cursor_move(server, time);
       return;
@@ -91,6 +143,7 @@ static void process_cursor_motion(struct simple_server *server, uint32_t time) {
       return;
    } 
 
+   // Otherwise, find teh view under the pointer and send the event along
    double sx, sy;
    struct wlr_seat *wlr_seat = server->seat->seat;
    struct wlr_surface *surface = NULL;
@@ -117,36 +170,41 @@ static void process_cursor_motion(struct simple_server *server, uint32_t time) {
 }
 
 static void cursor_motion_notify(struct wl_listener *listener, void *data) {
+   //say(DEBUG, "cursor_motion_notify");
    struct simple_seat *seat = wl_container_of(listener, seat, cursor_motion);
-   struct wlr_event_pointer_motion *event = data;
+   struct wlr_pointer_motion_event *event = data;
 
-   wlr_cursor_move(seat->cursor, event->device, event->delta_x, event->delta_y);
+   wlr_cursor_move(seat->cursor, &event->pointer->base, event->delta_x, event->delta_y);
    process_cursor_motion(seat->server, event->time_msec);
 }
 
 static void cursor_motion_abs_notify(struct wl_listener *listener, void *data) {
+  // say(DEBUG, "cursor_motion_abs_notify");
    struct simple_seat *seat = wl_container_of(listener, seat, cursor_motion_abs);
-   struct wlr_event_pointer_motion_absolute *event = data;
+   struct wlr_pointer_motion_absolute_event *event = data;
 
-   wlr_cursor_warp_absolute(seat->cursor, event->device, event->x, event->y);
+   wlr_cursor_warp_absolute(seat->cursor, &event->pointer->base, event->x, event->y);
    process_cursor_motion(seat->server, event->time_msec);
 }
 
 static void cursor_button_notify(struct wl_listener *listener, void *data) {
+   say(DEBUG, "cursor_button_notify");
    struct simple_seat *seat = wl_container_of(listener, seat, cursor_button);
    struct simple_server *server = seat->server;
-   struct wlr_event_pointer_button *event = data;
+   struct wlr_pointer_button_event *event = data;
    
+   // Notify the client with pointer focus that a button press has occurred
    wlr_seat_pointer_notify_button(seat->seat, event->time_msec, event->button, event->state);
 
    double sx, sy;
-   struct wlr_surface *surface;
+   struct wlr_surface *surface = NULL;
    //uint32_t resize_edges;
    struct simple_view *view = desktop_view_at(server, server->seat->cursor->x, server->seat->cursor->y, &surface, &sx, &sy);
 
    // button release
    if(event->state == WLR_BUTTON_RELEASED) {
       server->cmode = CURSOR_PASSTHROUGH;
+      server->grabbed_view = NULL;
       return;
    }
    
@@ -167,25 +225,27 @@ static void cursor_button_notify(struct wl_listener *listener, void *data) {
       begin_interactive(view, CURSOR_RESIZE, resize_edges);
       return;
    }
-
-   focus_view(view);
    
+   focus_view(view, surface);
 }
 
 static void cursor_axis_notify(struct wl_listener *listener, void *data) {
+   //say(DEBUG, "cursor_axis_notify");
    struct simple_seat *seat = wl_container_of(listener, seat, cursor_axis);
-   struct wlr_event_pointer_axis *event = data;
+   struct wlr_pointer_axis_event *event = data;
 
    wlr_seat_pointer_notify_axis(seat->seat, event->time_msec, event->orientation, event->delta, event->delta_discrete, event->source);
 }
 
 static void cursor_frame_notify(struct wl_listener *listener, void *data) {
+   //say(DEBUG, "cursor_frame_notify");
    struct simple_seat *seat = wl_container_of(listener, seat, cursor_frame);
 
    wlr_seat_pointer_notify_frame(seat->seat);
 }
 
-static void request_cursor_notify(struct wl_listener *listener, void *data) {
+static void seat_request_cursor_notify(struct wl_listener *listener, void *data) {
+   //say(DEBUG, "seat_request_cursor_notify");
    struct simple_seat *seat = wl_container_of(listener, seat, request_cursor);
    struct wlr_seat_pointer_request_set_cursor_event *event = data;
    struct wlr_seat_client *focused_client = seat->seat->pointer_state.focused_client;
@@ -195,19 +255,25 @@ static void request_cursor_notify(struct wl_listener *listener, void *data) {
    }
 }
 
-static void request_set_selection_notify(struct wl_listener *listener, void *data) {
+static void seat_request_set_selection_notify(struct wl_listener *listener, void *data) {
+   //say(DEBUG, "seat_request_set_selection_notify");
    struct simple_seat *seat = wl_container_of(listener, seat, request_set_selection);
    struct wlr_seat_request_set_selection_event *event = data;
    wlr_seat_set_selection(seat->seat, event->source, event->serial);
 }
 
 static void input_destroy_notify(struct wl_listener *listener, void *data) {
+   say(DEBUG, "input_destroy_notify");
    struct simple_input *input = wl_container_of(listener, input, destroy);
+   //wl_list_remove(&input->kb_modifiers.link);
+   //wl_list_remove(&input->kb_key.link);
+   wl_list_remove(&input->destroy.link);
    wl_list_remove(&input->link);
    free(input);
 }
 
 static void new_input_notify(struct wl_listener *listener, void *data) {
+   //say(DEBUG, "new_input_notify");
    struct simple_seat *seat = wl_container_of(listener, seat, new_input);
    struct wlr_input_device *device = data;
 
@@ -216,27 +282,32 @@ static void new_input_notify(struct wl_listener *listener, void *data) {
    input->seat = seat;
 
    if(device->type == WLR_INPUT_DEVICE_POINTER) {
+      say(DEBUG, "New Input: POINTER");
       wlr_cursor_attach_input_device(seat->cursor, input->device);
 
    } else if (device->type == WLR_INPUT_DEVICE_KEYBOARD) {
+      say(DEBUG, "New Input: KEYBOARD");
+      struct wlr_keyboard *kb = wlr_keyboard_from_input_device(device);
+      input->keyboard = kb;
 
       struct xkb_rule_names rules = { 0 };
       struct xkb_context *context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
       struct xkb_keymap *keymap = xkb_map_new_from_names(context, &rules, 
             XKB_KEYMAP_COMPILE_NO_FLAGS);
 
-      wlr_keyboard_set_keymap(device->keyboard, keymap);
+      wlr_keyboard_set_keymap(kb, keymap);
       xkb_keymap_unref(keymap);
       xkb_context_unref(context);
-      wlr_keyboard_set_repeat_info(device->keyboard, 25, 600);
+      wlr_keyboard_set_repeat_info(kb, 25, 600);
 
       input->kb_modifiers.notify = kb_modifiers_notify;
-      wl_signal_add(&device->keyboard->events.modifiers, &input->kb_modifiers);
+      wl_signal_add(&kb->events.modifiers, &input->kb_modifiers);
       input->kb_key.notify = kb_key_notify;
-      wl_signal_add(&device->keyboard->events.key, &input->kb_key);
+      wl_signal_add(&kb->events.key, &input->kb_key);
       
-      wlr_seat_set_keyboard(seat->seat, device);
-   } 
+      wlr_seat_set_keyboard(seat->seat, kb);
+   } else 
+      say(DEBUG, "New Input: SOMETHING ELSE");
 
    input->destroy.notify = input_destroy_notify;
    wl_signal_add(&device->events.destroy, &input->destroy);
@@ -259,15 +330,16 @@ static void new_input_notify(struct wl_listener *listener, void *data) {
 }
 
 //------------------------------------------------------------------------
-void initializeCursor(struct simple_seat *seat) {
+void initializeCursor(struct simple_server *server, struct simple_seat *seat) {
 
    seat->cursor = wlr_cursor_create();
-   wlr_cursor_attach_output_layout(seat->cursor, seat->server->output_layout); 
+   wlr_cursor_attach_output_layout(seat->cursor, server->output_layout); 
 
-   // cursor
+   // create a cursor manager
    seat->cursor_manager = wlr_xcursor_manager_create(NULL, 24);
    wlr_xcursor_manager_load(seat->cursor_manager, 1);
 
+   server->cmode = CURSOR_PASSTHROUGH;
    seat->cursor_motion.notify = cursor_motion_notify;
    wl_signal_add(&seat->cursor->events.motion, &seat->cursor_motion);
    seat->cursor_motion_abs.notify = cursor_motion_abs_notify;
@@ -278,15 +350,12 @@ void initializeCursor(struct simple_seat *seat) {
    wl_signal_add(&seat->cursor->events.axis, &seat->cursor_axis);
    seat->cursor_frame.notify = cursor_frame_notify;
    wl_signal_add(&seat->cursor->events.frame, &seat->cursor_frame);
- 
-   seat->request_cursor.notify = request_cursor_notify;
-   wl_signal_add(&seat->seat->events.request_set_cursor, &seat->request_cursor);
-   seat->request_set_selection.notify = request_set_selection_notify;
-   wl_signal_add(&seat->seat->events.request_set_selection, &seat->request_set_selection);
 }
 
 void initializeSeat(struct simple_server *server) {
    
+   server->seat = calloc(1, sizeof(struct simple_seat));
+
    struct simple_seat *seat = server->seat;
    seat->server = server;
 
@@ -298,7 +367,12 @@ void initializeSeat(struct simple_server *server) {
    seat->new_input.notify = new_input_notify;
    wl_signal_add(&server->backend->events.new_input, &seat->new_input);
 
-   initializeCursor(seat);
+   seat->request_cursor.notify = seat_request_cursor_notify;
+   wl_signal_add(&seat->seat->events.request_set_cursor, &seat->request_cursor);
+   seat->request_set_selection.notify = seat_request_set_selection_notify;
+   wl_signal_add(&seat->seat->events.request_set_selection, &seat->request_set_selection);
+
+   initializeCursor(server, seat);
 }
 
 void seat_focus_surface(struct simple_seat *seat, struct wlr_surface *surface) {

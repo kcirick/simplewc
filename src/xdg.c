@@ -1,81 +1,101 @@
+#include <assert.h>
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/types/wlr_scene.h>
 
 #include "globals.h"
 #include "server.h"
 #include "seat.h"
 
 //------------------------------------------------------------------------
-static void map_notify(struct wl_listener *listener, void *data) {
-   say(INFO, "map_notify");
+static void xdg_map_notify(struct wl_listener *listener, void *data) {
+   // called when the surface is mapped, or ready to display on-screen
+   say(INFO, "xdg_map_notify");
    struct simple_view *view = wl_container_of(listener, view, map);
-   struct simple_server *server = view->server;
+
+   wl_list_insert(&view->server->views, &view->link);
    view->mapped = true;
-
-   struct wlr_output *output = wlr_output_layout_output_at(server->output_layout, server->seat->cursor->x, server->seat->cursor->y);
-   struct wlr_output_layout_output *layout = wlr_output_layout_get(server->output_layout, output);
-   if(view->x == -1 || view->y == -1) {
-      struct wlr_surface_state *current = &view->xdg_surface->surface->current;
-      int owidth, oheight;
-      wlr_output_effective_resolution(output, &owidth, &oheight);
-      //move_view(view, layout->x + (owidth/2 - current->width/2),
-      //                layout->y + (oheight/2 - current->height/2));
-   } //else
-      //move_view(view, view->x, view->y);
-
-   focus_view(view);
+   
+   focus_view(view, view->xdg_toplevel->base->surface);
 }
 
-static void unmap_notify(struct wl_listener *listener, void *data) {
-   say(INFO, "unmap_notify");
+static void xdg_unmap_notify(struct wl_listener *listener, void *data) {
+   // called when the surface is unmapped, and should no longer be seen
+   say(INFO, "xdg_unmap_notify");
    struct simple_view *view = wl_container_of(listener, view, unmap);
+   // reset the cursor mode if the grabbed view was unmapped
+   if(view == view->server->grabbed_view){
+      view->server->cmode = CURSOR_PASSTHROUGH;
+      view->server->grabbed_view = NULL;
+   }
    view->mapped = false;
+
+   wl_list_remove(&view->link);
 }
 
-static void destroy_notify(struct wl_listener *listener, void *data) {
-   say(INFO, "destroy_notify");
+static void xdg_destroy_notify(struct wl_listener *listener, void *data) {
+   say(INFO, "xdg_destroy_notify");
    struct simple_view *view = wl_container_of(listener, view, destroy);
-   wl_list_remove(&view->link);
+   
+   wl_list_remove(&view->map.link);
+   wl_list_remove(&view->unmap.link);
+   wl_list_remove(&view->destroy.link);
+   wl_list_remove(&view->request_move.link);
+   wl_list_remove(&view->request_resize.link);
+   //wl_list_remove(&view->link);
+
    free(view);
 }
 
-static void request_move_notify(struct wl_listener *listener, void *data) {
+static void xdg_tl_request_move_notify(struct wl_listener *listener, void *data) {
    struct simple_view *view = wl_container_of(listener, view, request_move);
    begin_interactive(view, CURSOR_MOVE, 0);
 }
 
-static void request_resize_notify(struct wl_listener *listener, void *data) {
+static void xdg_tl_request_resize_notify(struct wl_listener *listener, void *data) {
    struct simple_view *view = wl_container_of(listener, view, request_resize);
    struct wlr_xdg_toplevel_resize_event *event = data;
    begin_interactive(view, CURSOR_RESIZE, event->edges);
 }
 
 //------------------------------------------------------------------------
-void new_xdg_surface_notify(struct wl_listener *listener, void *data) {
+void xdg_new_surface_notify(struct wl_listener *listener, void *data) {
    
-   say(INFO, "new_xdg_surface_notify");
-   struct simple_server *server = wl_container_of(listener, server, new_xdg_surface);
+   say(DEBUG, "new_xdg_surface_notify");
+   struct simple_server *server = wl_container_of(listener, server, xdg_new_surface);
    struct wlr_xdg_surface *xdg_surface = data;
-   if(xdg_surface->role != WLR_XDG_SURFACE_ROLE_TOPLEVEL) return;
 
+   // add xdg popups to the scene graph
+   if(xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
+      struct wlr_xdg_surface *parent = wlr_xdg_surface_from_wlr_surface(xdg_surface->popup->parent);
+      struct wlr_scene_tree *parent_tree = parent->data;
+      xdg_surface->data = wlr_scene_xdg_surface_create(parent_tree, xdg_surface);
+      return;
+   }
+   assert(xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL);
+
+   // allocate a simple_view for this surface
    struct simple_view *view = calloc(1, sizeof(struct simple_view));
    view->server = server;
+   view->type = XDG_SHELL_VIEW;
    view->xdg_surface = xdg_surface;
+   view->xdg_toplevel = xdg_surface->toplevel;
+   view->scene_tree = wlr_scene_xdg_surface_create(&view->server->scene->tree, view->xdg_toplevel->base);
+   view->scene_tree->node.data = view;
+   xdg_surface->data = view->scene_tree;
 
-   view->map.notify = map_notify;
+   view->map.notify = xdg_map_notify;
    wl_signal_add(&xdg_surface->events.map, &view->map);
-   view->unmap.notify = unmap_notify;
+   view->unmap.notify = xdg_unmap_notify;
    wl_signal_add(&xdg_surface->events.unmap, &view->unmap);
-   view->destroy.notify = destroy_notify;
+   view->destroy.notify = xdg_destroy_notify;
    wl_signal_add(&xdg_surface->events.destroy, &view->destroy);
 
    struct wlr_xdg_toplevel *toplevel = xdg_surface->toplevel;
-   view->request_move.notify = request_move_notify;
+   view->request_move.notify = xdg_tl_request_move_notify;
    wl_signal_add(&toplevel->events.request_move, &view->request_move);
-   view->request_resize.notify = request_resize_notify;
+   view->request_resize.notify = xdg_tl_request_resize_notify;
    wl_signal_add(&toplevel->events.request_resize, &view->request_resize);
-   
-   wl_list_insert(&server->views, &view->link);
 }
 

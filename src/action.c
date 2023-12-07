@@ -1,5 +1,5 @@
 #include <wayland-server-core.h>
-#include <wlr/types/wlr_box.h>
+#include <wlr/util/box.h>
 #include <xkbcommon/xkbcommon.h>
 
 #include "globals.h"

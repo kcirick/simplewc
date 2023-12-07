@@ -64,7 +64,6 @@ void readConfiguration(struct simple_config* config, char* filename) {
 
    set_defaults(config);
 
-   config->output = calloc(1, sizeof(struct output));
    wl_list_init(&config->key_bindings);
    //wl_list_init(&config->mouse_bindings);
 
@@ -82,12 +81,12 @@ void readConfiguration(struct simple_config* config, char* filename) {
       token = strtok(buffer, "=");
       strncpy(id, token, sizeof id); 
       trim(id);
-      if(id==NULL) continue;
+      //if(id==NULL) continue;
 
       token=strtok(NULL, "=");
       strncpy(value, token, sizeof value);
       trim(value);
-      if(value==NULL) continue;
+      //if(value==NULL) continue;
 
       say(DEBUG, "config id = '%s' / value = '%s'", id, value);
       if(!strcmp(id, "n_tags")) config->n_tags=atoi(value);
@@ -105,24 +104,6 @@ void readConfiguration(struct simple_config* config, char* filename) {
       if(!strcmp(id, "border_width")) config->border_width = atoi(value);
       if(!strcmp(id, "moveresize_step")) config->moveresize_step = atoi(value);
       
-      if(!strcmp(id, "output")) {
-         char subvalue[32];
-         token = strtok(value, ":");
-         strncpy(config->output->name, token, sizeof config->output->name);
-         token = strtok(NULL, "x");
-         strncpy(subvalue, token, sizeof subvalue);
-         config->output->width = atoi(subvalue);
-         token = strtok(NULL, "+");
-         strncpy(subvalue, token, sizeof subvalue);
-         config->output->height = atoi(subvalue);
-         token = strtok(NULL, "+");
-         strncpy(subvalue, token, sizeof subvalue);
-         config->output->x = atoi(subvalue);
-         token = strtok(NULL, "");
-         strncpy(subvalue, token, sizeof subvalue);
-         config->output->y = atoi(subvalue);
-      }
-
       if(!strcmp(id, "background_colour")) 
          colour2rgba(value, config->background_colour);
       if(!strcmp(id, "border_colour_focus")) 

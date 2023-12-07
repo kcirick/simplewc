@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <wlr/util/log.h>
+
 #define MAX_TAGS 10
 
 //--- enums -----
@@ -23,12 +25,6 @@ struct simple_config {
 
    float background_colour[4];
    float border_colour[NBORDERCOL][4];
-
-   struct output {
-      char name[32];
-      uint32_t x, y;
-      uint32_t width, height;
-   } *output;
 
    struct wl_list key_bindings;
    struct wl_list mouse_bindings;

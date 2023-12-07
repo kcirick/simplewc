@@ -24,6 +24,7 @@ struct simple_input {
    struct wl_list link;
    struct simple_seat *seat;
    struct wlr_input_device *device;
+   struct wlr_keyboard *keyboard;
    struct wl_listener destroy;
 
    struct wl_listener kb_modifiers;
