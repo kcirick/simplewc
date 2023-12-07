@@ -2,6 +2,7 @@
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include "globals.h"
 #include "server.h"
@@ -27,22 +28,27 @@ static void render_layer_surface(struct wlr_surface *surface, int sx, int sy, vo
 //--- Notify functions ---------------------------------------------------
 static void surface_commit_notify(struct wl_listener *listener, void *data) {
    //
+   say(INFO, "surface_commit_notify");
 }
 
 static void output_destroy_notify(struct wl_listener *listener, void *data) {
    //
+   say(INFO, "output_destroy_notify");
 }
 
 static void surface_destroy_notify(struct wl_listener *listener, void *data) {
    //
+   say(INFO, "surface_destroy_notify");
 }
 
 static void surface_map_notify(struct wl_listener *listener, void *data) {
    //
+   say(INFO, "surface_map_notify");
 }
 
 static void surface_unmap_notify(struct wl_listener *listener, void *data) {
    //
+   say(INFO, "surface_unmap_notify");
 }
 
 static void new_layer_surface_notify(struct wl_listener *listener, void *data) {
@@ -74,10 +80,10 @@ static void new_layer_surface_notify(struct wl_listener *listener, void *data) {
    surface->unmap.notify = surface_unmap_notify;
    wl_signal_add(&layer_surface->events.unmap, &surface->unmap);
 
-   wl_list_insert(&output->layers[layer_surface->client_pending.layer], &surface->link);
+   wl_list_insert(&output->layers[layer_surface->pending.layer], &surface->link);
 
    struct wlr_layer_surface_v1_state old_state = layer_surface->current;
-   layer_surface->current = layer_surface->client_pending;
+   layer_surface->current = layer_surface->pending;
    arrange_layers(output);
    layer_surface->current = old_state;
 }

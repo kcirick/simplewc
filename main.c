@@ -1,8 +1,13 @@
+/*
+ * main.c
+ *   - Main SWWM Program
+ */
+
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <wayland-server-core.h>
-#include <wlr/types/wlr_box.h>
+#include <wlr/util/box.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -11,6 +16,7 @@
 
 static bool debug = false;
 static const char *msg_str[NMSG] = { "DEBUG", "INFO", "WARNING", "ERROR" };
+
 
 //------------------------------------------------------------------------
 void say(int level, const char* message, ...) {
@@ -22,7 +28,7 @@ void say(int level, const char* message, ...) {
    vsnprintf(buffer, 256, message, args);
    va_end(args);
 
-   printf("SimpleWay [%s]: %s\n", msg_str[level], buffer);
+   printf("SWWM [%s]: %s\n", msg_str[level], buffer);
 
    if(level==ERROR) exit(EXIT_FAILURE);
 }
@@ -48,21 +54,33 @@ void spawn(char* cmd) {
    waitpid(pid, NULL, 0);
 }
 
+/*
 void sigchld(int unused) {
    if(signal(SIGCHLD, sigchld) == SIG_ERR)
       say(ERROR, "Can't install SIGCHLD handler!");
+
+#ifdef XWAYLAND
+   siginfo_t in;
+   while (!waitid(P_ALL, 0, &in, WEXITED|WNOHANG|WNOWAIT) && in.si_pid)
+      waitpid(in.si_pid, NULL, 0);
+#else
    while (0 < waitpid(-1, NULL, WNOHANG));
-}
+#endif
+}*/
 
 //--- Main function ------------------------------------------------------
 int main(int argc, char **argv) {
    char config_file[64] = { '\0' };
+   char start_cmd[64] = { '\0' };
 
    // Parse arguments
    for(int i=1; i<argc; i++){
       char* iarg = argv[i];
       if(!strcmp(iarg, "--config") && ((i+1)<argc)) {
          sprintf(config_file, argv[++i]);
+      }
+      else if (!strcmp(iarg, "--start") && ((i+1)<argc)) {
+         sprintf(start_cmd, argv[++i]);
       }
       else if(!strcmp(iarg, "--debug")) {
          debug = true;
@@ -72,27 +90,31 @@ int main(int argc, char **argv) {
          exit(EXIT_SUCCESS);
       }
       else if(!strcmp(iarg, "--help")) {
-         say(INFO, "Usage: simpleway [--config file][--debug][--version][--help]");
+         say(INFO, "Usage: swwm [--config file][--debug][--version][--help]");
          exit(EXIT_SUCCESS);
       }
    }
    
    if(config_file[0]=='\0')
-      sprintf(config_file, "%s/%s", getenv("HOME"), ".config/simpleway/configrc");
+      sprintf(config_file, "%s/%s", getenv("HOME"), ".config/swwm/configrc");
 
    if(debug) wlr_log_init(WLR_DEBUG, NULL);
 
-   struct simple_config g_config = { 0 };
+   struct simple_config g_config;
    readConfiguration(&g_config, config_file);
 
-   struct simple_server g_server = { 0 }; 
+   struct simple_server g_server; 
    prepareServer(&g_server, &g_config);
+   
+   //sigchld(0);
+   startServer(&g_server);
+   if(start_cmd[0]!='\0')
+      spawn(start_cmd);
 
-   sigchld(0);
-   runServer(&g_server);
-
+   wl_display_run(g_server.display);
+   
    cleanupServer(&g_server);
-
+     
    return EXIT_SUCCESS;
 }
 

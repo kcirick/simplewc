@@ -1,5 +1,5 @@
 VERSION = 0.1
-TARGET  = simpleway
+TARGET  = swwm 
 
 CC = gcc
 MY_CFLAGS = $(CFLAGS) -g -Wall -DVERSION=\"$(VERSION)\" \
@@ -10,6 +10,7 @@ MY_LFLAGS = $(LDFLAGS) -lwayland-server -lxkbcommon\
 
 WL_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wayland-protocols)
 WL_SCANNER=$(shell pkg-config --variable=wayland_scanner wayland-scanner)
+WLR_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wlr-protocols)
 
 SOURCES = src/action.c src/config.c src/layer.c src/seat.c src/server.c \
    src/xdg.c src/xwayland.c \
@@ -30,11 +31,11 @@ all: $(TARGET)
 
 wlr-layer-shell-unstable-v1-protocol.h:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
-	@$(WL_SCANNER) server-header proto/wlr-layer-shell-unstable-v1.xml $@
+	@$(WL_SCANNER) server-header $(WLR_PROTOCOLS)/unstable/wlr-layer-shell-unstable-v1.xml $@
 
 wlr-layer-shell-unstable-v1-protocol.c: wlr-layer-shell-unstable-v1-protocol.h
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] $< -> $@"
-	@$(WL_SCANNER) private-code proto/wlr-layer-shell-unstable-v1.xml $@
+	@$(WL_SCANNER) private-code $(WLR_PROTOCOLS)/unstable/wlr-layer-shell-unstable-v1.xml $@
 
 xdg-shell-protocol.h:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
