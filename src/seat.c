@@ -13,6 +13,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include "globals.h"
+#include "client.h"
 #include "server.h"
 #include "seat.h"
 #include "action.h"
@@ -70,24 +71,24 @@ static void kb_key_notify(struct wl_listener *listener, void *data) {
 }
 
 //--- Pointer events -----------------------------------------------------
-static uint32_t get_resize_edges(struct simple_view *view, double x, double y) {
+static uint32_t get_resize_edges(struct simple_client *client, double x, double y) {
    uint32_t edges = 0;
 
-   struct wlr_box box = view->current;
+   struct wlr_box box = client->geom;
    edges |= x < (box.x + box.width/2)  ? WLR_EDGE_LEFT : WLR_EDGE_RIGHT;
    edges |= y < (box.y + box.height/2) ? WLR_EDGE_TOP : WLR_EDGE_BOTTOM;
    return edges;
 }
 
 static void process_cursor_move(struct simple_server *server, uint32_t time) {
-   struct simple_view *view = server->grabbed_view;
-   view->current.x = server->seat->cursor->x - server->grab_x;
-   view->current.y = server->seat->cursor->y - server->grab_y;
-   wlr_scene_node_set_position(&view->scene_tree->node, view->current.x, view->current.y);
+   struct simple_client *client = server->grabbed_client;
+   client->geom.x = server->seat->cursor->x - server->grab_x;
+   client->geom.y = server->seat->cursor->y - server->grab_y;
+   wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
 }
 
 static void process_cursor_resize(struct simple_server *server, uint32_t time) {
-   struct simple_view *view = server->grabbed_view;
+   struct simple_client *client = server->grabbed_client;
    
    double delta_x = server->seat->cursor->x - server->grab_x;
    double delta_y = server->seat->cursor->y - server->grab_y;
@@ -116,48 +117,41 @@ static void process_cursor_resize(struct simple_server *server, uint32_t time) {
          new_right = new_left + 1;
    }
 
-   view->current.x = new_left;
-   view->current.y = new_top;
-   view->current.width = new_right - new_left;
-   view->current.height = new_bottom - new_top;
+   client->geom.x = new_left;
+   client->geom.y = new_top;
+   client->geom.width = new_right - new_left;
+   client->geom.height = new_bottom - new_top;
 
-   wlr_scene_node_set_position(&view->scene_tree->node, view->current.x, view->current.y);
-   if(view->type==XDG_SHELL_VIEW){
-      wlr_xdg_toplevel_set_size(view->xdg_toplevel, view->current.width, view->current.height);
-#if XWAYLAND
-   } else {
-      wlr_xwayland_surface_configure(view->xwayland_surface,
-            view->current.x, view->current.y, view->current.width, view->current.height);
-#endif
-   }
-
+   wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
+   set_client_size(client, client->geom);
 }
 
 static void process_cursor_motion(struct simple_server *server, uint32_t time) {
    //say(DEBUG, "process_cursor_motion");
-   if(server->cmode == CURSOR_MOVE) {
+   if(server->cursor_mode == CURSOR_MOVE) {
       process_cursor_move(server, time);
       return;
-   } else if(server->cmode == CURSOR_RESIZE) {
+   } else if(server->cursor_mode == CURSOR_RESIZE) {
       process_cursor_resize(server, time);
       return;
    } 
 
-   // Otherwise, find teh view under the pointer and send the event along
+   // Otherwise, find the client under the pointer and send the event along
    double sx, sy;
    struct wlr_seat *wlr_seat = server->seat->seat;
    struct wlr_surface *surface = NULL;
-   struct simple_view *view = desktop_view_at(server, server->seat->cursor->x, server->seat->cursor->y, &surface, &sx, &sy);
+   struct simple_client *client = client_at(server, server->seat->cursor->x, server->seat->cursor->y, &surface, &sx, &sy);
    
-   char *cname = NULL;
-   if(!view) {
-      cname = "left_ptr";
+   char *cursor_name = NULL;
+   if(!client) {
+      cursor_name = "left_ptr";
    } else {
       //get_resize_edges();
       //switch resize_edges:
    }
-   if(cname)
-      wlr_xcursor_manager_set_cursor_image(server->seat->cursor_manager, cname, server->seat->cursor);
+   if(cursor_name)
+      //wlr_xcursor_manager_set_cursor_image(server->seat->cursor_manager, cname, server->seat->cursor);
+      wlr_cursor_set_xcursor(server->seat->cursor, server->seat->cursor_manager, cursor_name);
 
    if(surface) {
       bool focus_changed = wlr_seat->pointer_state.focused_surface != surface;
@@ -199,34 +193,34 @@ static void cursor_button_notify(struct wl_listener *listener, void *data) {
    double sx, sy;
    struct wlr_surface *surface = NULL;
    //uint32_t resize_edges;
-   struct simple_view *view = desktop_view_at(server, server->seat->cursor->x, server->seat->cursor->y, &surface, &sx, &sy);
+   struct simple_client *client = client_at(server, server->seat->cursor->x, server->seat->cursor->y, &surface, &sx, &sy);
 
    // button release
    if(event->state == WLR_BUTTON_RELEASED) {
-      server->cmode = CURSOR_PASSTHROUGH;
-      server->grabbed_view = NULL;
+      server->cursor_mode = CURSOR_PASSTHROUGH;
+      server->grabbed_client = NULL;
       return;
    }
    
    // press on desktop
-   if(!view) {
+   if(!client) {
       say(INFO, "press on desktop");
       return;
    }
    
-   //press on view
+   //press on client 
    struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat->seat);
    uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard);
    if((modifiers & WLR_MODIFIER_ALT) && (event->button == BTN_LEFT) ) {
-      begin_interactive(view, CURSOR_MOVE, 0);
+      begin_interactive(client, CURSOR_MOVE, 0);
       return;
    } else if ((modifiers & WLR_MODIFIER_ALT) && (event->button == BTN_RIGHT) ) {
-      uint32_t resize_edges = get_resize_edges(view, server->seat->cursor->x, server->seat->cursor->y);
-      begin_interactive(view, CURSOR_RESIZE, resize_edges);
+      uint32_t resize_edges = get_resize_edges(client, server->seat->cursor->x, server->seat->cursor->y);
+      begin_interactive(client, CURSOR_RESIZE, resize_edges);
       return;
    }
    
-   focus_view(view, surface);
+   focus_client(client, surface);
 }
 
 static void cursor_axis_notify(struct wl_listener *listener, void *data) {
@@ -339,7 +333,7 @@ void initializeCursor(struct simple_server *server, struct simple_seat *seat) {
    seat->cursor_manager = wlr_xcursor_manager_create(NULL, 24);
    wlr_xcursor_manager_load(seat->cursor_manager, 1);
 
-   server->cmode = CURSOR_PASSTHROUGH;
+   server->cursor_mode = CURSOR_PASSTHROUGH;
    seat->cursor_motion.notify = cursor_motion_notify;
    wl_signal_add(&seat->cursor->events.motion, &seat->cursor_motion);
    seat->cursor_motion_abs.notify = cursor_motion_abs_notify;

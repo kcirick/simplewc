@@ -12,12 +12,9 @@ WL_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wayland-protocols)
 WL_SCANNER=$(shell pkg-config --variable=wayland_scanner wayland-scanner)
 WLR_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wlr-protocols)
 
-SOURCES = src/action.c src/config.c src/layer.c src/seat.c src/server.c \
-   src/xdg.c src/xwayland.c \
-   wlr-layer-shell-unstable-v1-protocol.c xdg-shell-protocol.c main.c
-HEADERS = include/action.h include/globals.h include/layer.h include/seat.h include/server.h \
-   include/xdg.h include/xwayland.h \
-   wlr-layer-shell-unstable-v1-protocol.h xdg-shell-protocol.h
+SOURCES = src/client.c src/action.c src/config.c src/seat.c src/server.c main.c
+HEADERS = include/client.h include/action.h include/globals.h include/seat.h include/server.h \
+			 include/wlr-layer-shell-unstable-v1-protocol.h include/xdg-shell-protocol.h
 OBJECTS = $(addprefix obj/, $(notdir $(SOURCES:.c=.o)))
 
 CRED     = "\\033[31m"
@@ -29,21 +26,13 @@ CRESET   = "\\033[0m"
 #-------------------------------------------------------------------------
 all: $(TARGET) 
 
-wlr-layer-shell-unstable-v1-protocol.h:
+include/wlr-layer-shell-unstable-v1-protocol.h:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) server-header $(WLR_PROTOCOLS)/unstable/wlr-layer-shell-unstable-v1.xml $@
 
-wlr-layer-shell-unstable-v1-protocol.c: wlr-layer-shell-unstable-v1-protocol.h
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] $< -> $@"
-	@$(WL_SCANNER) private-code $(WLR_PROTOCOLS)/unstable/wlr-layer-shell-unstable-v1.xml $@
-
-xdg-shell-protocol.h:
+include/xdg-shell-protocol.h:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) server-header $(WL_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
-
-xdg-shell-protocol.c: xdg-shell-protocol.h
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] $< -> $@"
-	@$(WL_SCANNER) private-code $(WL_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
 
 obj/%.o: %.c
 	@echo -e " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
@@ -64,8 +53,8 @@ clean:
 	@rm -f $(TARGET)
 	@echo -e " [ $(CRED)RM$(CRESET) ] $(OBJECTS)"
 	@rm -f $(OBJECTS)
-	@echo -e " [ $(CRED)RM$(CRESET) ] wlr-layer-shell-unstable-v1-protocol.{c,h} xdg-shell-protocol.{c,h}"
-	@rm -f wlr-layer-shell-unstable-v1-protocol.{c,h} xdg-shell-protocol.{c,h}
+	@echo -e " [ $(CRED)RM$(CRESET) ] wlr-layer-shell-unstable-v1-protocol.h xdg-shell-protocol.h"
+	@rm -f include/wlr-layer-shell-unstable-v1-protocol.h include/xdg-shell-protocol.h
 	@echo
 
 info:
@@ -78,5 +67,3 @@ info:
 	@echo "LFLAGS  = $(MY_LFLAGS)"
 
 .PHONY: all clean info
-
-

@@ -14,13 +14,12 @@
 #include "globals.h"
 #include "server.h"
 
-static bool debug = false;
+static int info_level = WLR_SILENT;
 static const char *msg_str[NMSG] = { "DEBUG", "INFO", "WARNING", "ERROR" };
-
 
 //------------------------------------------------------------------------
 void say(int level, const char* message, ...) {
-   if(level==DEBUG && !debug) return;
+   //if(level==DEBUG && !debug) return;
 
    char buffer[256];
    va_list args;
@@ -28,7 +27,8 @@ void say(int level, const char* message, ...) {
    vsnprintf(buffer, 256, message, args);
    va_end(args);
 
-   printf("SWWM [%s]: %s\n", msg_str[level], buffer);
+   //printf("SWWM [%s]: %s\n", msg_str[level], buffer);
+   wlr_log(WLR_INFO, " [%s]: %s", msg_str[level], buffer);
 
    if(level==ERROR) exit(EXIT_FAILURE);
 }
@@ -83,14 +83,17 @@ int main(int argc, char **argv) {
          sprintf(start_cmd, argv[++i]);
       }
       else if(!strcmp(iarg, "--debug")) {
-         debug = true;
+         info_level = WLR_DEBUG;
+      }
+      else if(!strcmp(iarg, "--info")) {
+         info_level = WLR_INFO;
       }
       else if(!strcmp(iarg, "--version")) {
          say(INFO, "Version-"VERSION);
          exit(EXIT_SUCCESS);
       }
       else if(!strcmp(iarg, "--help")) {
-         say(INFO, "Usage: swwm [--config file][--debug][--version][--help]");
+         say(INFO, "Usage: swwm [--config file][--debug][--info][--version][--help]");
          exit(EXIT_SUCCESS);
       }
    }
@@ -98,7 +101,7 @@ int main(int argc, char **argv) {
    if(config_file[0]=='\0')
       sprintf(config_file, "%s/%s", getenv("HOME"), ".config/swwm/configrc");
 
-   if(debug) wlr_log_init(WLR_DEBUG, NULL);
+   wlr_log_init(info_level, NULL);
 
    struct simple_config g_config;
    readConfiguration(&g_config, config_file);
@@ -106,7 +109,6 @@ int main(int argc, char **argv) {
    struct simple_server g_server; 
    prepareServer(&g_server, &g_config);
    
-   //sigchld(0);
    startServer(&g_server);
    if(start_cmd[0]!='\0')
       spawn(start_cmd);

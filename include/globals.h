@@ -15,6 +15,13 @@ enum MessageType { DEBUG, INFO, WARNING, ERROR, NMSG };
 enum BorderColours { FOCUSED, UNFOCUSED, URGENT, MARKED, FIXED, NBORDERCOL };
 enum KeyFunctions { SPAWN, QUIT, TAG, CLIENT, NFUNC };
 enum MouseContext { CONTEXT_ROOT, CONTEXT_CLIENT, NCONTEXT};
+enum cursor_mode { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE };
+enum client_type {
+   XDG_SHELL_CLIENT,
+#if XWAYLAND
+   XWAYLAND_CLIENT,
+#endif
+};
 
 struct simple_config {
    int n_tags;

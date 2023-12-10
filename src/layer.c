@@ -76,9 +76,9 @@ static void new_layer_surface_notify(struct wl_listener *listener, void *data) {
    surface->destroy.notify = surface_destroy_notify;
    wl_signal_add(&layer_surface->events.destroy, &surface->destroy);
    surface->map.notify = surface_map_notify;
-   wl_signal_add(&layer_surface->events.map, &surface->map);
+   wl_signal_add(&layer_surface->surface->events.map, &surface->map);
    surface->unmap.notify = surface_unmap_notify;
-   wl_signal_add(&layer_surface->events.unmap, &surface->unmap);
+   wl_signal_add(&layer_surface->surface->events.unmap, &surface->unmap);
 
    wl_list_insert(&output->layers[layer_surface->pending.layer], &surface->link);
 
@@ -90,7 +90,7 @@ static void new_layer_surface_notify(struct wl_listener *listener, void *data) {
 
 //------------------------------------------------------------------------
 void initializeLayers(struct simple_server *server) {
-   server->layer_shell = wlr_layer_shell_v1_create(server->display);
+   server->layer_shell = wlr_layer_shell_v1_create(server->display, 3);
 
    server->new_layer_surface.notify = new_layer_surface_notify;
    wl_signal_add(&server->layer_shell->events.new_surface, &server->new_layer_surface);
