@@ -70,7 +70,7 @@ void begin_interactive(struct simple_client *client, enum cursor_mode mode, uint
    if(client->type==XDG_SHELL_CLIENT) {
       if(client->xdg_surface->surface != wlr_surface_get_root_surface(focused_surface)) 
          return;
-   } else if(client->type==XWAYLAND_CLIENT){
+   } else if(client->type==XWAYLAND_MANAGED_CLIENT){
       if(client->xwayland_surface->surface != wlr_surface_get_root_surface(focused_surface))
          return;
    }
@@ -346,7 +346,8 @@ void xdg_new_surface_notify(struct wl_listener *listener, void *data) {
    // more...
 }
 
-//---- XWayland ----------------------------------------------------------
+//---- XWayland Shell ----------------------------------------------------
+/*
 static void xwl_commit_notify(struct wl_listener *listener, void *data) {
    say(INFO, "xwl_commit_notify");
    struct simple_client *client = wl_container_of(listener, client, commit);
@@ -359,6 +360,7 @@ static void xwl_commit_notify(struct wl_listener *listener, void *data) {
    //if(current->width != state->width || current->height != state->height)
    //   client_apply_geometry(client, state->width, state->height);
 }
+*/
 
 static void xwl_request_activate_notify(struct wl_listener *listener, void *data) {
    say(INFO, "xwl_request_activate_notify");
@@ -417,7 +419,7 @@ void xwl_new_surface_notify(struct wl_listener *listener, void *data) {
    struct simple_client *xwl_client = calloc(1, sizeof(struct simple_client));
 
    xwl_client->server = server;
-   xwl_client->type = XWAYLAND_CLIENT;
+   xwl_client->type = XWAYLAND_MANAGED_CLIENT;
    xwl_client->xwayland_surface = xsurface;
    xsurface->data = xwl_client;
 

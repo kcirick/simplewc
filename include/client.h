@@ -16,9 +16,6 @@ struct simple_client {
    struct wlr_scene_node *scene_node;
    struct wlr_scene_rect *border[4]; // top, bottom, left, right
 
-   // geometry of the wlr_surface within the view as currently displayed
-   struct wlr_box geom;
-
    struct wl_listener map;
    struct wl_listener unmap;
    struct wl_listener destroy;
@@ -38,7 +35,9 @@ struct simple_client {
 #endif
 
    bool mapped;
-   //int x, y, w, h;
+
+   // geometry of the wlr_surface within the view as currently displayed
+   struct wlr_box geom;
 };
 
 struct simple_client* client_at(struct simple_server*, double, double, struct wlr_surface**, double*, double*);

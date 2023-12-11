@@ -12,8 +12,8 @@ WL_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wayland-protocols)
 WL_SCANNER=$(shell pkg-config --variable=wayland_scanner wayland-scanner)
 WLR_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wlr-protocols)
 
-SOURCES = src/client.c src/action.c src/config.c src/seat.c src/server.c main.c
-HEADERS = include/client.h include/action.h include/globals.h include/seat.h include/server.h \
+SOURCES = src/client.c src/action.c src/config.c src/layer.c src/seat.c src/server.c main.c
+HEADERS = include/client.h include/action.h include/globals.h include/layer.h include/seat.h include/server.h \
 			 include/wlr-layer-shell-unstable-v1-protocol.h include/xdg-shell-protocol.h
 OBJECTS = $(addprefix obj/, $(notdir $(SOURCES:.c=.o)))
 

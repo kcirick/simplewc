@@ -13,9 +13,13 @@ struct simple_server {
    struct wlr_scene *scene;
    struct wlr_scene_output_layout *scene_layout;
 
-   struct wlr_output_layout *output_layout;
    struct wl_list outputs;
+   struct wlr_output_layout *output_layout;
    struct wl_listener new_output;
+   struct wl_listener output_layout_change;
+
+   struct wlr_output_manager_v1 *output_manager;
+   struct wl_listener output_manager_apply;
 
 
    struct wl_list clients;
@@ -27,8 +31,9 @@ struct simple_server {
    struct wl_listener xwl_ready;
 #endif
 
+   struct wl_list layer_shells;
    struct wlr_layer_shell_v1 *layer_shell;
-   struct wl_listener new_layer_surface;
+   struct wl_listener layer_new_surface;
 
    struct simple_seat *seat;
 
@@ -43,11 +48,15 @@ struct simple_output {
    struct wl_list link;
    struct simple_server *server;
    struct wlr_output *wlr_output;
+
+   struct wlr_scene_tree *layer_tree[4];
+   struct wl_list layers[4];
+
    struct wl_listener frame;
    struct wl_listener request_state;
    struct wl_listener destroy;
 
-   struct wl_list layers[4];
+   struct wlr_box usable_area;
 };
 
 void prepareServer(struct simple_server*, struct simple_config*);

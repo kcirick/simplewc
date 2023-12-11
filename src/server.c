@@ -8,10 +8,12 @@
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_data_device.h>
-//#include <wlr/types/wlr_layer_shell_v1.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
+#include <wlr/types/wlr_output_management_v1.h>
+#include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_xdg_output_v1.h>
@@ -22,13 +24,22 @@
 #include <wlr/xwayland.h>
 #endif
 
+//
+//#include <wlr/types/wlr_export_dmabuf_v1.h>
+//#include <wlr/types/wlr_screencopy_v1.h>
+//#include <wlr/types/wlr_data_control_v1.h>
+//#include <wlr/types/wlr_primary_selection.h>
+//#include <wlr/types/wlr_primary_selection_v1.h>
+//#include <wlr/types/wlr_viewporter.h>
+//#include <wlr/types/wlr_single_pixel_buffer_v1.h>
+//#include <wlr/types/wlr_fractional_scale_v1.h>
+//
+
 #include "globals.h"
 #include "client.h"
 #include "server.h"
 #include "layer.h"
 #include "seat.h"
-
-#define XDG_SHELL_VERSION (3)
 
 /*
 static struct wl_event_source *sighup_source;
@@ -47,9 +58,48 @@ static int handle_sigterm(int signal, void *data){
 }
 */
 
+static struct wlr_output_configuration_v1 *create_output_config(struct simple_server *server){
+   struct wlr_output_configuration_v1 *config = wlr_output_configuration_v1_create();
+   if(!config)
+      say(ERROR, "wlr_output_configuration_v1_create failed");
+
+   struct simple_output *output;
+   wl_list_for_each(output, &server->outputs, link) {
+      struct wlr_output_configuration_head_v1 *head = wlr_output_configuration_head_v1_create(config, output->wlr_output);
+      if(!head) {
+         wlr_output_configuration_v1_destroy(config);
+         say(ERROR, "wlr_output_configuration_head_v1_create failed");
+      }
+      struct wlr_box box;
+      wlr_output_layout_get_box(server->output_layout, output->wlr_output, &box);
+      if(wlr_box_empty(&box))
+         say(ERROR, "Failed to get output layout box");
+      head->state.x = box.x;
+      head->state.y = box.y;
+   }
+   return config;
+}
+
 //--- Notify functions ---------------------------------------------------
+static void output_layout_change_notify(struct wl_listener *listener, void *data) {
+   say(DEBUG, "output_layout_change_notify");
+   struct simple_server *server = wl_container_of(listener, server, output_layout_change);
+
+   struct wlr_output_configuration_v1 *config = create_output_config(server);
+   if(config)
+      wlr_output_manager_v1_set_configuration(server->output_manager, config);
+   else
+      say(ERROR, "wlr_output_manager_v1_set_configuration failed");
+   //output_update_for_layout_change()
+}
+
+static void output_manager_apply_notify(struct wl_listener *listener, void *data) {
+   say(DEBUG, "output_manager_apply_notify");
+   //
+}
+
 static void output_frame_notify(struct wl_listener *listener, void *data) {
-   say(DEBUG, "output_frame_notify");
+   //say(DEBUG, "output_frame_notify");
    struct simple_output *output = wl_container_of(listener, output, frame);
    struct wlr_scene *scene = output->server->scene;
    struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(scene, output->wlr_output);
@@ -112,6 +162,7 @@ static void new_output_notify(struct wl_listener *listener, void *data) {
 
    struct simple_output *output = calloc(1, sizeof(struct simple_output));
    output->wlr_output = wlr_output;
+   wlr_output->data = output;
    output->server = server;
 
    output->frame.notify = output_frame_notify;
@@ -122,6 +173,12 @@ static void new_output_notify(struct wl_listener *listener, void *data) {
    wl_signal_add(&wlr_output->events.destroy, &output->destroy);
 
    wl_list_insert(&server->outputs, &output->link);
+
+   // initialize the scene graph used to lay out windows
+   for(int i=0; i<4; i++) {
+      output->layer_tree[i] = wlr_scene_tree_create(&server->scene->tree);
+      wl_list_init(&output->layers[i]);
+   }
 
    //wl_list_init(&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND]);
    //wl_list_init(&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM]);
@@ -137,6 +194,7 @@ static void new_output_notify(struct wl_listener *listener, void *data) {
    say(INFO, " -> Output %s : %dx%d+%d+%d", l_output->output->name,
          l_output->output->width, l_output->output->height, 
          l_output->x, l_output->y);
+
 }
 
 //------------------------------------------------------------------------
@@ -150,6 +208,14 @@ void initializeOutputLayout(struct simple_server *server) {
    // create a scene graph
    server->scene = wlr_scene_create();
    server->scene_layout = wlr_scene_attach_output_layout(server->scene, server->output_layout);
+
+   wlr_xdg_output_manager_v1_create(server->display, server->output_layout);
+   server->output_manager = wlr_output_manager_v1_create(server->display);
+
+   server->output_layout_change.notify = output_layout_change_notify;
+   wl_signal_add(&server->output_layout->events.change, &server->output_layout_change);
+   server->output_manager_apply.notify = output_manager_apply_notify;
+   wl_signal_add(&server->output_manager->events.apply, &server->output_manager_apply);
 }
 
 void initializeXDGShell(struct simple_server *server) {
@@ -164,6 +230,13 @@ void initializeXDGShell(struct simple_server *server) {
 
    //unmanaged surfaces
  
+}
+
+void initializeLayers(struct simple_server *server) {
+   server->layer_shell = wlr_layer_shell_v1_create(server->display, LAYER_SHELL_VERSION);
+
+   server->layer_new_surface.notify = layer_new_surface_notify;
+   wl_signal_add(&server->layer_shell->events.new_surface, &server->layer_new_surface);
 }
 
 #if XWAYLAND
@@ -186,6 +259,9 @@ void initializeXWayland(struct simple_server *server) {
 void prepareServer(struct simple_server *server, struct simple_config *config) {
    say(INFO, "Preparing Wayland server initialization");
    
+   // Read config
+   server->config = config;
+
    server->display = wl_display_create();
    if(!server->display)
       say(ERROR, "Unable to create Wayland display!");
@@ -216,8 +292,6 @@ void prepareServer(struct simple_server *server, struct simple_config *config) {
       say(ERROR, "unable to drop root");
    */
 
-   server->config = config;
-
    // create renderer
    server->renderer = wlr_renderer_autocreate(server->backend);
    if(!server->renderer)
@@ -235,18 +309,30 @@ void prepareServer(struct simple_server *server, struct simple_config *config) {
    wlr_subcompositor_create(server->display);
    wlr_data_device_manager_create(server->display);
 
+   /*
+   wlr_export_dmabuf_manager_v1_create(server->display);
+   wlr_screencopy_manager_v1_create(server->display);
+   wlr_data_control_manager_v1_create(server->display);
+   wlr_primary_selection_v1_device_manager_create(server->display);
+   wlr_viewporter_create(server->display);
+   wlr_single_pixel_buffer_manager_v1_create(server->display);
+   wlr_fractional_scale_manager_v1_create(server->display, 1);
+   */
+   
    // create an output layout, i.e. wlroots utility for working with an arrangement of 
    // screens in a physical layout
    initializeOutputLayout(server);
    
-   // set up xdg-shell 
-   initializeXDGShell(server);
-
    // set up seat and inputs
    initializeSeat(server);
 
-   //initializeLayers(server);
+   struct wlr_presentation *presentation = wlr_presentation_create(server->display, server->backend);
+   if(!presentation) say(ERROR, "Unable to create presentation interface");
+   wlr_scene_set_presentation(server->scene, presentation);
 
+   // set up Wayland shells, i.e. XDG, Layer, and XWayland
+   initializeXDGShell(server);
+   initializeLayers(server);
 #if XWAYLAND
    initializeXWayland(server);
 #endif
