@@ -1,4 +1,5 @@
 #include <wayland-server-core.h>
+#include <wlr/backend/session.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
@@ -8,9 +9,10 @@
 #include "globals.h"
 #include "server.h"
 #include "layer.h"
-#include "seat.h"
 
-void arrange_layer(struct wl_list *list, const struct wlr_box *full_area, struct wlr_box *usable_area, bool exclusive) {
+void 
+arrange_layer(struct wl_list *list, const struct wlr_box *full_area, struct wlr_box *usable_area, bool exclusive) 
+{
    struct simple_layer_surface *surface;
    wl_list_for_each(surface, list, link) {
       struct wlr_scene_layer_surface_v1 *scene = surface->scene_layer_surface;
@@ -20,7 +22,9 @@ void arrange_layer(struct wl_list *list, const struct wlr_box *full_area, struct
    }
 }
 
-void arrange_layers(struct simple_output *output) {
+void
+arrange_layers(struct simple_output *output)
+{
    say(INFO, "arrange_layers");
 
    struct wlr_box full_area = { 0 };
@@ -43,46 +47,56 @@ void arrange_layers(struct simple_output *output) {
       arrange_layer(&output->layers[i], &full_area, &usable_area, /* exclusive */ false);
 
       // set node position to account for output layout change
-      wlr_scene_node_set_position(&output->layer_tree[i]->node, scene_output->x, scene_output->y);
+      wlr_scene_node_set_position(&server->layer_tree[i]->node, scene_output->x, scene_output->y);
    }
    output -> usable_area = usable_area;
 }
 
 //--- Notify functions ---------------------------------------------------
-static void layer_surface_map_notify(struct wl_listener *listener, void *data) {
+static void 
+layer_surface_map_notify(struct wl_listener *listener, void *data) 
+{
    //
    say(INFO, "layer_surface_map_notify");
 }
 
-static void layer_surface_unmap_notify(struct wl_listener *listener, void *data) {
+static void 
+layer_surface_unmap_notify(struct wl_listener *listener, void *data) 
+{
    //
    say(INFO, "layer_surface_unmap_notify");
 }
 
-static void layer_surface_commit_notify(struct wl_listener *listener, void *data) {
+static void 
+layer_surface_commit_notify(struct wl_listener *listener, void *data) 
+{
    //
    say(INFO, "layer_surface_commit_notify");
 }
 
-static void layer_surface_destroy_notify(struct wl_listener *listener, void *data) {
+static void 
+layer_surface_destroy_notify(struct wl_listener *listener, void *data) 
+{
    //
    say(INFO, "layer_surface_destroy_notify");
 }
 
 //------------------------------------------------------------------------
-void layer_new_surface_notify(struct wl_listener *listener, void *data) {
+void 
+layer_new_surface_notify(struct wl_listener *listener, void *data) 
+{
    say(INFO, "layer_new_surface_notify");
    struct simple_server *server = wl_container_of(listener, server, layer_new_surface);
    struct wlr_layer_surface_v1 *layer_surface = data;
 
    if(!layer_surface->output) {
       layer_surface->output = wlr_output_layout_output_at(
-            server->output_layout, server->seat->cursor->x, server->seat->cursor->y);
+            server->output_layout, server->cursor->x, server->cursor->y);
    }
 
    struct simple_output *output = layer_surface->output->data;
 
-   struct wlr_scene_tree *selected_layer = output->layer_tree[layer_surface->current.layer];
+   struct wlr_scene_tree *selected_layer = server->layer_tree[layer_surface->pending.layer];
 
    struct simple_layer_surface *lsurface = calloc(1, sizeof(struct simple_layer_surface));
    lsurface->scene_layer_surface = wlr_scene_layer_surface_v1_create(selected_layer, layer_surface);
@@ -90,17 +104,19 @@ void layer_new_surface_notify(struct wl_listener *listener, void *data) {
       wlr_layer_surface_v1_destroy(layer_surface);
       say(ERROR, "Could not create layer surface");
    }
+   lsurface->type = LAYER_SHELL_CLIENT;
    lsurface->server = server;
+   lsurface->output = output;
    lsurface->scene_layer_surface->layer_surface = layer_surface;
+   lsurface->scene_tree = lsurface->scene_layer_surface->tree;
+   lsurface->popups = wlr_scene_tree_create(selected_layer);
+   layer_surface->data = lsurface;
+   lsurface->scene_tree->node.data = lsurface;
 
-   lsurface->map.notify = layer_surface_map_notify;
-   wl_signal_add(&layer_surface->surface->events.map, &lsurface->map);
-   lsurface->unmap.notify = layer_surface_unmap_notify;
-   wl_signal_add(&layer_surface->surface->events.unmap, &lsurface->unmap);
-   lsurface->surface_commit.notify = layer_surface_commit_notify;
-   wl_signal_add(&layer_surface->surface->events.commit, &lsurface->surface_commit);
-   lsurface->destroy.notify = layer_surface_destroy_notify;
-   wl_signal_add(&layer_surface->events.destroy, &lsurface->destroy);
+   LISTEN(&layer_surface->surface->events.map, &lsurface->map, layer_surface_map_notify);
+   LISTEN(&layer_surface->surface->events.unmap, &lsurface->unmap, layer_surface_unmap_notify);
+   LISTEN(&layer_surface->surface->events.commit, &lsurface->surface_commit, layer_surface_commit_notify);
+   LISTEN(&layer_surface->events.destroy, &lsurface->destroy, layer_surface_destroy_notify);
 
    wl_list_insert(&output->layers[layer_surface->pending.layer], &lsurface->link);
 

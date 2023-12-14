@@ -3,9 +3,14 @@
 
 struct simple_layer_surface {
    struct wl_list link;
+   struct simple_server *server;
+   struct simple_output *output;
+   enum client_type type;
+
    //struct wlr_layer_surface_v1 *layer_surface;
    struct wlr_scene_layer_surface_v1 *scene_layer_surface;
-   struct simple_server *server;
+   struct wlr_scene_tree *scene_tree;
+   struct wlr_scene_tree *popups;
 
    struct wl_listener map;
    struct wl_listener unmap;
@@ -19,8 +24,5 @@ struct simple_layer_surface {
 };
 
 void layer_new_surface_notify(struct wl_listener*, void*);
-
-//void initializeLayers(struct simple_server*);
-//void render_layer(struct simple_output *, struct wl_list *);
 
 #endif

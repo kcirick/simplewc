@@ -7,19 +7,28 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <wayland-server-core.h>
+#include <wlr/backend/session.h>
+#include <wlr/types/wlr_scene.h>
 #include <wlr/util/box.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
+#if XWAYLAND
+#include <wlr/xwayland.h>
+#endif
 
 #include "globals.h"
 #include "server.h"
 
-static int info_level = WLR_SILENT;
 static const char *msg_str[NMSG] = { "DEBUG", "INFO", "WARNING", "ERROR" };
+static struct wlr_session *g_session;
+static struct simple_server* g_server;
+static int info_level = WLR_SILENT;
 
 //------------------------------------------------------------------------
-void say(int level, const char* message, ...) {
-   //if(level==DEBUG && !debug) return;
+void 
+say(int level, const char* message, ...) 
+{
+   if(level==DEBUG && info_level!=WLR_DEBUG) return;
 
    char buffer[256];
    va_list args;
@@ -27,13 +36,15 @@ void say(int level, const char* message, ...) {
    vsnprintf(buffer, 256, message, args);
    va_end(args);
 
-   //printf("SWWM [%s]: %s\n", msg_str[level], buffer);
-   wlr_log(WLR_INFO, " [%s]: %s", msg_str[level], buffer);
+   printf("SWWM [%s]: %s\n", msg_str[level], buffer);
+   //wlr_log(WLR_INFO, " [%s]: %s", msg_str[level], buffer);
 
    if(level==ERROR) exit(EXIT_FAILURE);
 }
 
-void spawn(char* cmd) {
+void 
+spawn(char* cmd) 
+{
    char *sh = NULL;
    if(!(sh=getenv("SHELL"))) sh = (char*)"/bin/sh";
 
@@ -54,22 +65,27 @@ void spawn(char* cmd) {
    waitpid(pid, NULL, 0);
 }
 
-/*
-void sigchld(int unused) {
-   if(signal(SIGCHLD, sigchld) == SIG_ERR)
-      say(ERROR, "Can't install SIGCHLD handler!");
-
+void 
+signal_handler(int sig) 
+{
+   if(sig == SIGCHLD) {
 #ifdef XWAYLAND
-   siginfo_t in;
-   while (!waitid(P_ALL, 0, &in, WEXITED|WNOHANG|WNOWAIT) && in.si_pid)
-      waitpid(in.si_pid, NULL, 0);
+      siginfo_t in;
+      while (  !waitid(P_ALL, 0, &in, WEXITED|WNOHANG|WNOWAIT) 
+               && in.si_pid
+               && (!g_server->xwayland || in.si_pid != g_server->xwayland->server->pid) )
+         waitpid(in.si_pid, NULL, 0);
 #else
-   while (0 < waitpid(-1, NULL, WNOHANG));
+      while (0 < waitpid(-1, NULL, WNOHANG));
 #endif
-}*/
+   } else if (sig == SIGINT || sig == SIGTERM )
+      quitServer(g_server);
+}
 
 //--- Main function ------------------------------------------------------
-int main(int argc, char **argv) {
+int 
+main(int argc, char **argv) 
+{
    char config_file[64] = { '\0' };
    char start_cmd[64] = { '\0' };
 
@@ -97,26 +113,38 @@ int main(int argc, char **argv) {
          exit(EXIT_SUCCESS);
       }
    }
-   
    if(config_file[0]=='\0')
       sprintf(config_file, "%s/%s", getenv("HOME"), ".config/swwm/configrc");
 
-   wlr_log_init(info_level, NULL);
+   // Wayland requires XDG_RUNTIME_DIR for creating its communications socket
+   if(!getenv("XDG_RUNTIME_DIR"))
+      say(ERROR, "XDG_RUNTIME_DIR must be set!");
 
-   struct simple_config g_config;
-   readConfiguration(&g_config, config_file);
+   // handle signals
+   int signals[] = { SIGCHLD, SIGINT, SIGTERM, SIGPIPE };
+   struct sigaction sa;
+   sigemptyset(&sa.sa_mask);
+   sa.sa_flags = 0;
+   sa.sa_handler = signal_handler;
 
-   struct simple_server g_server; 
-   prepareServer(&g_server, &g_config);
+   for(int i=0; i<LENGTH(signals); i++)
+      sigaction(signals[i], &sa, NULL);
+
+   if(!(g_server = calloc(1, sizeof(struct simple_server))))
+      say(ERROR, "Cannot allocate g_server");
+
+   g_server->config = readConfiguration(config_file);
+
+   prepareServer(g_server, g_session, info_level);
    
-   startServer(&g_server);
-   if(start_cmd[0]!='\0')
-      spawn(start_cmd);
+   startServer(g_server);
 
-   wl_display_run(g_server.display);
+   // Run startup comand if defined
+   if(start_cmd[0]!='\0') spawn(start_cmd);
+
+   wl_display_run(g_server->display);
    
-   cleanupServer(&g_server);
+   cleanupServer(g_server);
      
    return EXIT_SUCCESS;
 }
-

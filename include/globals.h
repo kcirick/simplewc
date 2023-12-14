@@ -15,20 +15,18 @@
 
 #define N_LAYER_SHELL_LAYERS 4
 
+// macros
+#define LISTEN(E, L, H) wl_signal_add((E), ((L)->notify = (H), (L)))
+#define LENGTH(X)       (sizeof X / sizeof X[0])
+
 //--- enums -----
 enum MessageType { DEBUG, INFO, WARNING, ERROR, NMSG };
 enum BorderColours { FOCUSED, UNFOCUSED, URGENT, MARKED, FIXED, NBORDERCOL };
 enum KeyFunctions { SPAWN, QUIT, TAG, CLIENT, NFUNC };
 enum MouseContext { CONTEXT_ROOT, CONTEXT_CLIENT, NCONTEXT};
 enum cursor_mode { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE };
-enum client_type {
-   XDG_SHELL_CLIENT,
-   LAYER_SHELL_CLIENT,
-#if XWAYLAND
-   XWAYLAND_MANAGED_CLIENT,
-   XWAYLAND_UNMANAGED_CLIENT,
-#endif
-};
+enum client_type { XDG_SHELL_CLIENT, LAYER_SHELL_CLIENT, XWL_MANAGED_CLIENT, XWL_UNMANAGED_CLIENT };
+enum inputType {INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
 
 struct simple_config {
    int n_tags;
@@ -63,7 +61,7 @@ struct mousemap {
 };
 
 //--- functions in config.c -----
-void readConfiguration(struct simple_config*, char*);
+struct simple_config * readConfiguration(char*);
 
 //--- functions in main.c -----
 void say(int, const char*, ...);

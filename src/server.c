@@ -1,8 +1,10 @@
 #include <unistd.h>
 #include <assert.h>
 #include <signal.h>
+#include <linux/input-event-codes.h>
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
+#include <wlr/backend/session.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
@@ -20,6 +22,7 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/util/edges.h>
+#include <xkbcommon/xkbcommon.h>
 #if XWAYLAND
 #include <wlr/xwayland.h>
 #endif
@@ -39,34 +42,27 @@
 #include "client.h"
 #include "server.h"
 #include "layer.h"
-#include "seat.h"
+#include "action.h"
 
-/*
-static struct wl_event_source *sighup_source;
-static struct wl_event_source *sigint_source;
-static struct wl_event_source *sigterm_source;
 
-static int handle_sighup(int signal, void *data){
-   return 0;
-}
+//--- Output notify functions --------------------------------------------
+static void 
+output_layout_change_notify(struct wl_listener *listener, void *data) 
+{
+   say(DEBUG, "output_layout_change_notify");
+   struct simple_server *server = wl_container_of(listener, server, output_layout_change);
 
-static int handle_sigterm(int signal, void *data){
-   struct wl_display *display = data;
-
-   wl_display_terminate(display);
-   return 0;
-}
-*/
-
-static struct wlr_output_configuration_v1 *create_output_config(struct simple_server *server){
    struct wlr_output_configuration_v1 *config = wlr_output_configuration_v1_create();
+   struct wlr_output_configuration_head_v1 *config_head;
    if(!config)
       say(ERROR, "wlr_output_configuration_v1_create failed");
 
    struct simple_output *output;
    wl_list_for_each(output, &server->outputs, link) {
-      struct wlr_output_configuration_head_v1 *head = wlr_output_configuration_head_v1_create(config, output->wlr_output);
-      if(!head) {
+      if(!output->wlr_output->enabled) continue;
+
+      config_head = wlr_output_configuration_head_v1_create(config, output->wlr_output);
+      if(!config_head) {
          wlr_output_configuration_v1_destroy(config);
          say(ERROR, "wlr_output_configuration_head_v1_create failed");
       }
@@ -74,31 +70,38 @@ static struct wlr_output_configuration_v1 *create_output_config(struct simple_se
       wlr_output_layout_get_box(server->output_layout, output->wlr_output, &box);
       if(wlr_box_empty(&box))
          say(ERROR, "Failed to get output layout box");
-      head->state.x = box.x;
-      head->state.y = box.y;
+      output->usable_area = box;
+      say(INFO, " box x=%d / y=%d", box.x, box.y);
+
+      //arrange_layers(output);
+
+      config_head->state.x = box.x;
+      config_head->state.y = box.y;
    }
-   return config;
-}
 
-//--- Notify functions ---------------------------------------------------
-static void output_layout_change_notify(struct wl_listener *listener, void *data) {
-   say(DEBUG, "output_layout_change_notify");
-   struct simple_server *server = wl_container_of(listener, server, output_layout_change);
-
-   struct wlr_output_configuration_v1 *config = create_output_config(server);
    if(config)
       wlr_output_manager_v1_set_configuration(server->output_manager, config);
    else
       say(ERROR, "wlr_output_manager_v1_set_configuration failed");
-   //output_update_for_layout_change()
 }
 
-static void output_manager_apply_notify(struct wl_listener *listener, void *data) {
+static void 
+output_manager_apply_notify(struct wl_listener *listener, void *data) 
+{
    say(DEBUG, "output_manager_apply_notify");
    //
 }
 
-static void output_frame_notify(struct wl_listener *listener, void *data) {
+static void 
+output_manager_test_notify(struct wl_listener *listener, void *data) 
+{
+   say(DEBUG, "output_manager_test_notify");
+   //
+}
+
+static void 
+output_frame_notify(struct wl_listener *listener, void *data) 
+{
    //say(DEBUG, "output_frame_notify");
    struct simple_output *output = wl_container_of(listener, output, frame);
    struct wlr_scene *scene = output->server->scene;
@@ -112,7 +115,9 @@ static void output_frame_notify(struct wl_listener *listener, void *data) {
    wlr_scene_output_send_frame_done(scene_output, &now);
 }
 
-static void output_request_state_notify(struct wl_listener *listener, void *data) {
+static void 
+output_request_state_notify(struct wl_listener *listener, void *data) 
+{
    say(DEBUG, "output_request_state_notify");
    // called when the backend requests a new state for the output
    struct simple_output *output = wl_container_of(listener, output, request_state);
@@ -120,7 +125,9 @@ static void output_request_state_notify(struct wl_listener *listener, void *data
    wlr_output_commit_state(output->wlr_output, event->state);
 }
 
-static void output_destroy_notify(struct wl_listener *listener, void *data) {
+static void 
+output_destroy_notify(struct wl_listener *listener, void *data) 
+{
    say(DEBUG, "output_destroy_notify");
    struct simple_output *output = wl_container_of(listener, output, destroy);
 
@@ -131,7 +138,9 @@ static void output_destroy_notify(struct wl_listener *listener, void *data) {
    free(output);
 }
 
-static void new_output_notify(struct wl_listener *listener, void *data) {
+static void 
+new_output_notify(struct wl_listener *listener, void *data) 
+{
    say(DEBUG, "new_output_notify");
    
    struct simple_server *server = wl_container_of(listener, server, new_output);
@@ -165,150 +174,388 @@ static void new_output_notify(struct wl_listener *listener, void *data) {
    wlr_output->data = output;
    output->server = server;
 
-   output->frame.notify = output_frame_notify;
-   wl_signal_add(&wlr_output->events.frame, &output->frame);
-   output->request_state.notify = output_request_state_notify;
-   wl_signal_add(&wlr_output->events.request_state, &output->request_state);
-   output->destroy.notify = output_destroy_notify;
-   wl_signal_add(&wlr_output->events.destroy, &output->destroy);
+   LISTEN(&wlr_output->events.frame, &output->frame, output_frame_notify);
+   LISTEN(&wlr_output->events.destroy, &output->destroy, output_destroy_notify);
+   LISTEN(&wlr_output->events.request_state, &output->request_state, output_request_state_notify);
 
    wl_list_insert(&server->outputs, &output->link);
 
-   // initialize the scene graph used to lay out windows
-   for(int i=0; i<4; i++) {
-      output->layer_tree[i] = wlr_scene_tree_create(&server->scene->tree);
+   for(int i=0; i<4; i++)
       wl_list_init(&output->layers[i]);
-   }
-
-   //wl_list_init(&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND]);
-   //wl_list_init(&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM]);
-   //wl_list_init(&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP]);
-   //wl_list_init(&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY]);
 
    struct wlr_output_layout_output *l_output =
       wlr_output_layout_add_auto(server->output_layout, wlr_output);
    struct wlr_scene_output *scene_output =
       wlr_scene_output_create(server->scene, wlr_output);
-   wlr_scene_output_layout_add_output(server->scene_layout, l_output, scene_output);
+   wlr_scene_output_layout_add_output(server->scene_output_layout, l_output, scene_output);
 
    say(INFO, " -> Output %s : %dx%d+%d+%d", l_output->output->name,
          l_output->output->width, l_output->output->height, 
          l_output->x, l_output->y);
-
 }
 
 //------------------------------------------------------------------------
-void initializeOutputLayout(struct simple_server *server) {
-   server->output_layout = wlr_output_layout_create();
-
-   wl_list_init(&server->outputs);   
-   server->new_output.notify = new_output_notify;
-   wl_signal_add(&server->backend->events.new_output, &server->new_output);   
-
-   // create a scene graph
-   server->scene = wlr_scene_create();
-   server->scene_layout = wlr_scene_attach_output_layout(server->scene, server->output_layout);
-
-   wlr_xdg_output_manager_v1_create(server->display, server->output_layout);
-   server->output_manager = wlr_output_manager_v1_create(server->display);
-
-   server->output_layout_change.notify = output_layout_change_notify;
-   wl_signal_add(&server->output_layout->events.change, &server->output_layout_change);
-   server->output_manager_apply.notify = output_manager_apply_notify;
-   wl_signal_add(&server->output_manager->events.apply, &server->output_manager_apply);
+void 
+input_focus_surface(struct simple_server *server, struct wlr_surface *surface) 
+{
+   if(!surface) {
+      wlr_seat_keyboard_notify_clear_focus(server->seat);
+      return;
+   }
+   struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
+      
+   wlr_seat_keyboard_notify_enter(server->seat, surface, keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
 }
 
-void initializeXDGShell(struct simple_server *server) {
+//--- Keyboard events ----------------------------------------------------
+static void 
+kb_modifiers_notify(struct wl_listener *listener, void *data) 
+{
+   struct simple_input *keyboard = wl_container_of(listener, keyboard, kb_modifiers);
 
-   wl_list_init(&server->clients);
-   server->xdg_shell = wlr_xdg_shell_create(server->display, XDG_SHELL_VERSION);
-   if(!server->xdg_shell)
-      say(ERROR, "unable to create XDG shell interface");
-
-   server->xdg_new_surface.notify = xdg_new_surface_notify;
-   wl_signal_add(&server->xdg_shell->events.new_surface, &server->xdg_new_surface);
-
-   //unmanaged surfaces
- 
+   wlr_seat_set_keyboard(keyboard->server->seat, keyboard->keyboard);
+   wlr_seat_keyboard_notify_modifiers(keyboard->server->seat, &keyboard->keyboard->modifiers);
 }
 
-void initializeLayers(struct simple_server *server) {
-   server->layer_shell = wlr_layer_shell_v1_create(server->display, LAYER_SHELL_VERSION);
+static void 
+kb_key_notify(struct wl_listener *listener, void *data) 
+{
+   struct simple_input *keyboard = wl_container_of(listener, keyboard, kb_key);
+   struct simple_server *server = keyboard->server;
+   struct wlr_keyboard_key_event *event = data;
 
-   server->layer_new_surface.notify = layer_new_surface_notify;
-   wl_signal_add(&server->layer_shell->events.new_surface, &server->layer_new_surface);
+   uint32_t keycode = event->keycode + 8;
+   const xkb_keysym_t *syms;
+   int nsyms = xkb_state_key_get_syms(keyboard->keyboard->xkb_state, keycode, &syms);
+   
+   bool handled = false;
+   uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->keyboard);
+
+   if(event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+      for(int i=0; i<nsyms; i++){
+         struct keymap *keymap;
+         wl_list_for_each(keymap, &server->config->key_bindings, link) {
+            if (modifiers ^ keymap->mask) continue;
+
+            if (syms[i] == keymap->keysym){
+               key_function(server, keymap);
+               handled=true;
+            }
+         }
+      }
+   }
+
+   if(!handled) {
+      wlr_seat_set_keyboard(server->seat, keyboard->keyboard);
+      wlr_seat_keyboard_notify_key(server->seat, event->time_msec, event->keycode, event->state);
+   }
 }
 
-#if XWAYLAND
-void initializeXWayland(struct simple_server *server) {
+//--- Pointer events -----------------------------------------------------
+static uint32_t 
+get_resize_edges(struct simple_client *client, double x, double y) 
+{
+   uint32_t edges = 0;
 
-   server->xwayland = wlr_xwayland_create(server->display, server->compositor, true);
-   if(!server->xwayland)
-      say(ERROR, "unable to create xwayland server");
-
-   server->xwl_new_surface.notify = xwl_new_surface_notify;
-   wl_signal_add(&server->xwayland->events.new_surface, &server->xwl_new_surface);
-
-   server->xwl_ready.notify = xwl_ready_notify;
-   wl_signal_add(&server->xwayland->events.ready, &server->xwl_ready);
-
+   struct wlr_box box = client->geom;
+   edges |= x < (box.x + box.width/2)  ? WLR_EDGE_LEFT : WLR_EDGE_RIGHT;
+   edges |= y < (box.y + box.height/2) ? WLR_EDGE_TOP : WLR_EDGE_BOTTOM;
+   return edges;
 }
-#endif
+
+static void 
+process_cursor_move(struct simple_server *server, uint32_t time) 
+{
+   struct simple_client *client = server->grabbed_client;
+   client->geom.x = server->cursor->x - server->grab_x;
+   client->geom.y = server->cursor->y - server->grab_y;
+   wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
+}
+
+static void 
+process_cursor_resize(struct simple_server *server, uint32_t time) 
+{
+   struct simple_client *client = server->grabbed_client;
+   
+   double delta_x = server->cursor->x - server->grab_x;
+   double delta_y = server->cursor->y - server->grab_y;
+   int new_left = server->grab_box.x;
+   int new_right = server->grab_box.x + server->grab_box.width;
+   int new_top = server->grab_box.y;
+   int new_bottom = server->grab_box.y + server->grab_box.height;
+   
+   if (server->resize_edges & WLR_EDGE_TOP) {
+      new_top += delta_y;
+      if(new_top >= new_bottom)
+         new_top = new_bottom - 1;
+   } else if (server->resize_edges & WLR_EDGE_BOTTOM) {
+      new_bottom += delta_y;
+      if(new_bottom <= new_top)
+         new_bottom = new_top + 1;
+   }
+   
+   if (server->resize_edges & WLR_EDGE_LEFT) {
+      new_left += delta_x;
+      if(new_left >= new_right)
+         new_left = new_right - 1;
+   } else if (server->resize_edges & WLR_EDGE_RIGHT) {
+      new_right += delta_x;
+      if(new_right <= new_left)
+         new_right = new_left + 1;
+   }
+
+   client->geom.x = new_left;
+   client->geom.y = new_top;
+   client->geom.width = new_right - new_left;
+   client->geom.height = new_bottom - new_top;
+
+   wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
+   set_client_size(client, client->geom);
+}
+
+static void 
+process_cursor_motion(struct simple_server *server, uint32_t time) 
+{
+   //say(DEBUG, "process_cursor_motion");
+   if(server->cursor_mode == CURSOR_MOVE) {
+      process_cursor_move(server, time);
+      return;
+   } else if(server->cursor_mode == CURSOR_RESIZE) {
+      process_cursor_resize(server, time);
+      return;
+   } 
+
+   // Otherwise, find the client under the pointer and send the event along
+   double sx, sy;
+   struct wlr_seat *wlr_seat = server->seat;
+   struct wlr_surface *surface = NULL;
+   struct simple_client *client = get_client_at(server, server->cursor->x, server->cursor->y, &surface, &sx, &sy);
+   
+   if(!client)
+      wlr_cursor_set_xcursor(server->cursor, server->cursor_manager, "left_ptr");
+
+   if(surface) {
+      wlr_seat_pointer_notify_enter(wlr_seat, surface, sx, sy);
+      wlr_seat_pointer_notify_motion(wlr_seat, time, sx, sy);
+   } else
+      wlr_seat_pointer_clear_focus(wlr_seat);
+}
 
 //------------------------------------------------------------------------
-void prepareServer(struct simple_server *server, struct simple_config *config) {
+static void 
+cursor_motion_notify(struct wl_listener *listener, void *data) 
+{
+   //say(DEBUG, "cursor_motion_notify");
+   struct simple_server *server = wl_container_of(listener, server, cursor_motion);
+   struct wlr_pointer_motion_event *event = data;
+
+   wlr_cursor_move(server->cursor, &event->pointer->base, event->delta_x, event->delta_y);
+   process_cursor_motion(server, event->time_msec);
+}
+
+static void 
+cursor_motion_abs_notify(struct wl_listener *listener, void *data) 
+{
+  // say(DEBUG, "cursor_motion_abs_notify");
+   struct simple_server *server = wl_container_of(listener, server, cursor_motion_abs);
+   struct wlr_pointer_motion_absolute_event *event = data;
+
+   wlr_cursor_warp_absolute(server->cursor, &event->pointer->base, event->x, event->y);
+   process_cursor_motion(server, event->time_msec);
+}
+
+static void 
+cursor_button_notify(struct wl_listener *listener, void *data) 
+{
+   say(DEBUG, "cursor_button_notify");
+   struct simple_server *server = wl_container_of(listener, server, cursor_button);
+   struct wlr_pointer_button_event *event = data;
+   
+   // Notify the client with pointer focus that a button press has occurred
+   wlr_seat_pointer_notify_button(server->seat, event->time_msec, event->button, event->state);
+
+   double sx, sy;
+   struct wlr_surface *surface = NULL;
+   //uint32_t resize_edges;
+   struct simple_client *client = get_client_at(server, server->cursor->x, server->cursor->y, &surface, &sx, &sy);
+
+   // button release
+   if(event->state == WLR_BUTTON_RELEASED) {
+      server->cursor_mode = CURSOR_PASSTHROUGH;
+      server->grabbed_client = NULL;
+      return;
+   }
+   
+   // press on desktop
+   if(!client) {
+      say(INFO, "press on desktop");
+      return;
+   }
+   
+   //press on client 
+   struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
+   uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard);
+   if((modifiers & WLR_MODIFIER_ALT) && (event->button == BTN_LEFT) ) {
+      begin_interactive(client, CURSOR_MOVE, 0);
+      return;
+   } else if ((modifiers & WLR_MODIFIER_ALT) && (event->button == BTN_RIGHT) ) {
+      uint32_t resize_edges = get_resize_edges(client, server->cursor->x, server->cursor->y);
+      begin_interactive(client, CURSOR_RESIZE, resize_edges);
+      return;
+   }
+   
+   focus_client(client, surface);
+}
+
+static void 
+cursor_axis_notify(struct wl_listener *listener, void *data) 
+{
+   //say(DEBUG, "cursor_axis_notify");
+   struct simple_server *server = wl_container_of(listener, server, cursor_axis);
+   struct wlr_pointer_axis_event *event = data;
+
+   wlr_seat_pointer_notify_axis(server->seat, event->time_msec, event->orientation, event->delta, event->delta_discrete, event->source);
+}
+
+static void 
+cursor_frame_notify(struct wl_listener *listener, void *data) 
+{
+   //say(DEBUG, "cursor_frame_notify");
+   struct simple_server *server = wl_container_of(listener, server, cursor_frame);
+
+   wlr_seat_pointer_notify_frame(server->seat);
+}
+
+static void 
+request_cursor_notify(struct wl_listener *listener, void *data) 
+{
+   //say(DEBUG, "seat_request_cursor_notify");
+   struct simple_server *server = wl_container_of(listener, server, request_cursor);
+   struct wlr_seat_pointer_request_set_cursor_event *event = data;
+   struct wlr_seat_client *focused_client = server->seat->pointer_state.focused_client;
+   
+   if(focused_client == event->seat_client) {
+      wlr_cursor_set_surface(server->cursor, event->surface, event->hotspot_x, event->hotspot_y);
+   }
+}
+
+static void 
+request_set_selection_notify(struct wl_listener *listener, void *data) 
+{
+   //say(DEBUG, "seat_request_set_selection_notify");
+   struct simple_server *server = wl_container_of(listener, server, request_set_selection);
+   struct wlr_seat_request_set_selection_event *event = data;
+   wlr_seat_set_selection(server->seat, event->source, event->serial);
+}
+
+static void 
+input_destroy_notify(struct wl_listener *listener, void *data) 
+{
+   say(DEBUG, "input_destroy_notify");
+   struct simple_input *input = wl_container_of(listener, input, destroy);
+   if (input->type==INPUT_KEYBOARD) {
+      wl_list_remove(&input->kb_modifiers.link);
+      wl_list_remove(&input->kb_key.link);
+   }
+   wl_list_remove(&input->destroy.link);
+   wl_list_remove(&input->link);
+   free(input);
+}
+
+//--- Input notify function ----------------------------------------------
+static void 
+new_input_notify(struct wl_listener *listener, void *data) 
+{
+   //say(DEBUG, "new_input_notify");
+   struct simple_server *server = wl_container_of(listener, server, new_input);
+   struct wlr_input_device *device = data;
+
+   struct simple_input *input = calloc(1, sizeof(struct simple_input));
+   input->device = device;
+   input->server = server;
+
+   if(device->type == WLR_INPUT_DEVICE_POINTER) {
+      say(DEBUG, "New Input: POINTER");
+      input->type = INPUT_POINTER;
+      wlr_cursor_attach_input_device(server->cursor, input->device);
+
+   } else if (device->type == WLR_INPUT_DEVICE_KEYBOARD) {
+      say(DEBUG, "New Input: KEYBOARD");
+      input->type = INPUT_KEYBOARD;
+      struct wlr_keyboard *kb = wlr_keyboard_from_input_device(device);
+      input->keyboard = kb;
+
+      struct xkb_rule_names rules = { 0 };
+      struct xkb_context *context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+      struct xkb_keymap *keymap = xkb_map_new_from_names(context, &rules, 
+            XKB_KEYMAP_COMPILE_NO_FLAGS);
+
+      wlr_keyboard_set_keymap(kb, keymap);
+      xkb_keymap_unref(keymap);
+      xkb_context_unref(context);
+      wlr_keyboard_set_repeat_info(kb, 25, 600);
+
+      LISTEN(&kb->events.modifiers, &input->kb_modifiers, kb_modifiers_notify);
+      LISTEN(&kb->events.key, &input->kb_key, kb_key_notify);
+      
+      wlr_seat_set_keyboard(server->seat, kb);
+   } else {
+      say(DEBUG, "New Input: SOMETHING ELSE");
+      input->type = INPUT_MISC;
+   }
+
+   LISTEN(&device->events.destroy, &input->destroy, input_destroy_notify);
+   wl_list_insert(&server->inputs, &input->link);
+
+   uint32_t caps = 0;
+   wl_list_for_each(input, &server->inputs, link) {
+      switch (input->device->type){
+         case WLR_INPUT_DEVICE_KEYBOARD:
+            caps |= WL_SEAT_CAPABILITY_KEYBOARD;
+            break;
+         case WLR_INPUT_DEVICE_POINTER:
+            caps |= WL_SEAT_CAPABILITY_POINTER;
+            break;
+         default:
+            break;
+      }
+   }
+   wlr_seat_set_capabilities(server->seat, caps);
+}
+
+//------------------------------------------------------------------------
+void 
+prepareServer(struct simple_server *server, struct wlr_session *session, int info_level) 
+{
    say(INFO, "Preparing Wayland server initialization");
    
-   // Read config
-   server->config = config;
+   wlr_log_init(info_level, NULL);
 
-   server->display = wl_display_create();
-   if(!server->display)
+   if(!(server->display = wl_display_create()))
       say(ERROR, "Unable to create Wayland display!");
 
-   /*
-   // Catch SIGHUP
-   struct wl_event_loop *event_loop = NULL;
-   event_loop = wl_display_get_event_loop(server->display);
-   sighup_source  = wl_event_loop_add_signal(event_loop, SIGHUP, handle_sighup, NULL);
-   sigint_source  = wl_event_loop_add_signal(event_loop, SIGINT, handle_sigterm, server->display);
-   sigterm_source = wl_event_loop_add_signal(event_loop, SIGTERM, handle_sigterm, server->display);
-   //server->wl_event_loop = event_loop;
-   */
-
-   server->backend = wlr_backend_autocreate(server->display, NULL);
-   if(!server->backend)
+   if(!(server->backend = wlr_backend_autocreate(server->display, &session)))
       say(ERROR, "Unable to create wlr_backend!");
 
-   /*
-   // drop permissions
-   if(getuid() != geteuid() || getgid() !=getegid()){
-      if(setgid(getgid()))
-         say(ERROR, "unable to drop root group");
-      if(setuid(getuid()))
-         say(ERROR, "unable to drop root user");
-   }
-   if(setgid(0) != -1 || setuid(0) != -1)
-      say(ERROR, "unable to drop root");
-   */
+   // create a scene graph used to lay out windows
+   server->scene = wlr_scene_create();
+   for(int i=0; i<4; i++)
+      server->layer_tree[i] = wlr_scene_tree_create(&server->scene->tree);
 
    // create renderer
-   server->renderer = wlr_renderer_autocreate(server->backend);
-   if(!server->renderer)
+   if(!(server->renderer = wlr_renderer_autocreate(server->backend)))
       say(ERROR, "Unable to create wlr_renderer");
 
    wlr_renderer_init_wl_display(server->renderer, server->display);
  
    // create an allocator
-   server->allocator = wlr_allocator_autocreate(server->backend, server->renderer);
-   if(!server->allocator)
+   if(!(server->allocator = wlr_allocator_autocreate(server->backend, server->renderer)))
       say(ERROR, "Unable to create wlr_allocator");
 
    // create compositor
    server->compositor = wlr_compositor_create(server->display, 5, server->renderer);
    wlr_subcompositor_create(server->display);
    wlr_data_device_manager_create(server->display);
-
    /*
    wlr_export_dmabuf_manager_v1_create(server->display);
    wlr_screencopy_manager_v1_create(server->display);
@@ -321,25 +568,80 @@ void prepareServer(struct simple_server *server, struct simple_config *config) {
    
    // create an output layout, i.e. wlroots utility for working with an arrangement of 
    // screens in a physical layout
-   initializeOutputLayout(server);
+   server->output_layout = wlr_output_layout_create();
+   LISTEN(&server->output_layout->events.change, &server->output_layout_change, output_layout_change_notify);
+
+   wl_list_init(&server->outputs);   
+   LISTEN(&server->backend->events.new_output, &server->new_output, new_output_notify);
+
+   server->scene_output_layout = wlr_scene_attach_output_layout(server->scene, server->output_layout);
+
+   wlr_xdg_output_manager_v1_create(server->display, server->output_layout);
+   server->output_manager = wlr_output_manager_v1_create(server->display);
+   LISTEN(&server->output_manager->events.apply, &server->output_manager_apply, output_manager_apply_notify);
+   LISTEN(&server->output_manager->events.test, &server->output_manager_test, output_manager_test_notify);
    
    // set up seat and inputs
-   initializeSeat(server);
+   server->seat = wlr_seat_create(server->display, "seat0");
+   if(!server->seat)
+      say(ERROR, "cannot allocate seat");
 
-   struct wlr_presentation *presentation = wlr_presentation_create(server->display, server->backend);
-   if(!presentation) say(ERROR, "Unable to create presentation interface");
-   wlr_scene_set_presentation(server->scene, presentation);
+   wl_list_init(&server->inputs);
+   LISTEN(&server->backend->events.new_input, &server->new_input, new_input_notify);
+
+   LISTEN(&server->seat->events.request_set_cursor, &server->request_cursor, request_cursor_notify);
+   LISTEN(&server->seat->events.request_set_selection, &server->request_set_selection, request_set_selection_notify);
+
+   server->cursor = wlr_cursor_create();
+   wlr_cursor_attach_output_layout(server->cursor, server->output_layout); 
+
+   // create a cursor manager
+   server->cursor_manager = wlr_xcursor_manager_create(NULL, 24);
+   wlr_xcursor_manager_load(server->cursor_manager, 1);
+
+   server->cursor_mode = CURSOR_PASSTHROUGH;
+   LISTEN(&server->cursor->events.motion, &server->cursor_motion, cursor_motion_notify);
+   LISTEN(&server->cursor->events.motion_absolute, &server->cursor_motion_abs, cursor_motion_abs_notify);
+   LISTEN(&server->cursor->events.button, &server->cursor_button, cursor_button_notify);
+   LISTEN(&server->cursor->events.axis, &server->cursor_axis, cursor_axis_notify);
+   LISTEN(&server->cursor->events.frame, &server->cursor_frame, cursor_frame_notify);
+
 
    // set up Wayland shells, i.e. XDG, Layer, and XWayland
-   initializeXDGShell(server);
-   initializeLayers(server);
-#if XWAYLAND
-   initializeXWayland(server);
-#endif
+   wl_list_init(&server->clients);
+   wl_list_init(&server->focus_order);
+   
+   if(!(server->xdg_shell = wlr_xdg_shell_create(server->display, XDG_SHELL_VERSION)))
+      say(ERROR, "unable to create XDG shell interface");
+   LISTEN(&server->xdg_shell->events.new_surface, &server->xdg_new_surface, xdg_new_surface_notify);
 
+   server->layer_shell = wlr_layer_shell_v1_create(server->display, LAYER_SHELL_VERSION);
+   LISTEN(&server->layer_shell->events.new_surface, &server->layer_new_surface, layer_new_surface_notify);
+   
+   //unmanaged surfaces
+   // ...
+
+   // idle_notifier = ...
+   // idle_inhibit_manager = ...
+   // LISTEN ...
+
+   struct wlr_presentation *presentation = wlr_presentation_create(server->display, server->backend);
+   wlr_scene_set_presentation(server->scene, presentation);
+
+#if XWAYLAND
+   if(!(server->xwayland = wlr_xwayland_create(server->display, server->compositor, true))) {
+      say(INFO, "unable to create xwayland server. Continuing without it");
+      return;
+   }
+
+   LISTEN(&server->xwayland->events.new_surface, &server->xwl_new_surface, xwl_new_surface_notify);
+   LISTEN(&server->xwayland->events.ready, &server->xwl_ready, xwl_ready_notify);
+#endif
 }
 
-void startServer(struct simple_server *server) {
+void 
+startServer(struct simple_server *server) 
+{
 
    const char* socket = wl_display_add_socket_auto(server->display);
    if(!socket){
@@ -353,7 +655,6 @@ void startServer(struct simple_server *server) {
    }
    
    setenv("WAYLAND_DISPLAY", socket, true);
-   
    say(INFO, "Wayland server is running on WAYLAND_DISPLAY=%s ...", socket);
 
 #if XWAYLAND
@@ -361,19 +662,12 @@ void startServer(struct simple_server *server) {
       say(WARNING, " -> Unable to set DISPLAY for xwayland");
    else 
       say(INFO, " -> XWayland is running on display %s", server->xwayland->display_name);
-   
-   struct wlr_xcursor *xcursor;
-   xcursor = wlr_xcursor_manager_get_xcursor(server->seat->cursor_manager, "left_ptr", 1);
-   if(xcursor){
-      struct wlr_xcursor_image *image = xcursor->images[0];
-      wlr_xwayland_set_cursor(server->xwayland, image->buffer, 
-            image->width*4, image->width, image->height, image->hotspot_x, image->hotspot_y);
-   }
 #endif
 }
 
-void cleanupServer(struct simple_server *server) {
-   
+void 
+cleanupServer(struct simple_server *server) 
+{
    say(DEBUG, "cleanupServer");
 #if XWAYLAND
    server->xwayland = NULL;
@@ -383,9 +677,16 @@ void cleanupServer(struct simple_server *server) {
       wlr_backend_destroy(server->backend);
 
    wl_display_destroy_clients(server->display);
-   wlr_scene_node_destroy(&server->scene->tree.node);
-   wlr_xcursor_manager_destroy(server->seat->cursor_manager);
+   wlr_xcursor_manager_destroy(server->cursor_manager);
    wlr_output_layout_destroy(server->output_layout);
    wl_display_destroy(server->display);
+   // Destroy after the wayland display
+   wlr_scene_node_destroy(&server->scene->tree.node);
    say(INFO, "Disconnected from display");
+}
+
+void
+quitServer(struct simple_server *server) 
+{
+   wl_display_terminate(server->display);
 }

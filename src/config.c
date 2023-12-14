@@ -59,7 +59,10 @@ void set_defaults(struct simple_config *config){
    colour2rgba("#0000FF", config->border_colour[FIXED]);
 }
 
-void readConfiguration(struct simple_config* config, char* filename) {
+struct simple_config * readConfiguration(char* filename) {
+
+   struct simple_config * config = calloc(1, sizeof(struct simple_config));
+
    say(INFO, "Reading configuration file %s", filename);
 
    set_defaults(config);
@@ -171,5 +174,5 @@ void readConfiguration(struct simple_config* config, char* filename) {
          // TODO
       }
    }
-
+   return config;
 }

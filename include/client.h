@@ -4,6 +4,7 @@
 struct simple_client {
    struct wl_list link;
    struct simple_server *server;
+   struct simple_output *output;
    enum client_type type;
 
    //struct wlr_surface *surface;
@@ -40,7 +41,7 @@ struct simple_client {
    struct wlr_box geom;
 };
 
-struct simple_client* client_at(struct simple_server*, double, double, struct wlr_surface**, double*, double*);
+struct simple_client* get_client_at(struct simple_server*, double, double, struct wlr_surface**, double*, double*);
 void focus_client(struct simple_client*, struct wlr_surface *surface);
 void begin_interactive(struct simple_client*, enum cursor_mode, uint32_t);
 
