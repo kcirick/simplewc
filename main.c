@@ -139,8 +139,12 @@ main(int argc, char **argv)
    
    startServer(g_server);
 
-   // Run startup comand if defined
+   // Run autostarts and startup comand if defined
    if(start_cmd[0]!='\0') spawn(start_cmd);
+   struct autostart *autostart;
+   wl_list_for_each(autostart, &g_server->config->autostarts, link) {
+      spawn(autostart->command);
+   }
 
    wl_display_run(g_server->display);
    

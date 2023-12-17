@@ -8,16 +8,19 @@
 
 #include <wlr/util/log.h>
 
-#define MAX_TAGS 10
+#define MAX_TAGS 9
 
 #define XDG_SHELL_VERSION (3)
 #define LAYER_SHELL_VERSION (4)
+#define COMPOSITOR_VERSION (5)
 
 #define N_LAYER_SHELL_LAYERS 4
 
 // macros
-#define LISTEN(E, L, H) wl_signal_add((E), ((L)->notify = (H), (L)))
-#define LENGTH(X)       (sizeof X / sizeof X[0])
+#define LISTEN(E, L, H)    wl_signal_add((E), ((L)->notify = (H), (L)))
+#define LENGTH(X)          (sizeof X / sizeof X[0])
+#define TAGMASK(T)         (1 << (T))
+#define VISIBLEON(C, O)    ((O) && (C)->output==(O) && ((C)->tags & (O)->cur_tag)) 
 
 //--- enums -----
 enum MessageType { DEBUG, INFO, WARNING, ERROR, NMSG };
@@ -27,6 +30,7 @@ enum MouseContext { CONTEXT_ROOT, CONTEXT_CLIENT, NCONTEXT};
 enum cursor_mode { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE };
 enum client_type { XDG_SHELL_CLIENT, LAYER_SHELL_CLIENT, XWL_MANAGED_CLIENT, XWL_UNMANAGED_CLIENT };
 enum inputType {INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
+enum {LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, NLayers }; // scene layers
 
 struct simple_config {
    int n_tags;
@@ -40,6 +44,7 @@ struct simple_config {
 
    struct wl_list key_bindings;
    struct wl_list mouse_bindings;
+   struct wl_list autostarts;
 };
 
 struct keymap {
@@ -58,6 +63,11 @@ struct mousemap {
    char argument[32];
    
    struct wl_list link;
+};
+
+struct autostart {
+   struct wl_list link;
+   char command[32];
 };
 
 //--- functions in config.c -----

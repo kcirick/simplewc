@@ -68,7 +68,8 @@ struct simple_config * readConfiguration(char* filename) {
    set_defaults(config);
 
    wl_list_init(&config->key_bindings);
-   //wl_list_init(&config->mouse_bindings);
+   wl_list_init(&config->mouse_bindings);
+   wl_list_init(&config->autostarts);
 
    FILE *f;
    if(!(f=fopen(filename, "r")))
@@ -106,7 +107,8 @@ struct simple_config * readConfiguration(char* filename) {
 
       if(!strcmp(id, "border_width")) config->border_width = atoi(value);
       if(!strcmp(id, "moveresize_step")) config->moveresize_step = atoi(value);
-      
+      if(!strcmp(id, "sloppy_focus")) config->sloppy_focus = !strcmp(value, "true") ? true : false; 
+
       if(!strcmp(id, "background_colour")) 
          colour2rgba(value, config->background_colour);
       if(!strcmp(id, "border_colour_focus")) 
@@ -172,6 +174,13 @@ struct simple_config * readConfiguration(char* filename) {
 
       if(!strcmp(id, "MOUSE")){
          // TODO
+      }
+
+      if(!strcmp(id, "AUTOSTART")){
+         struct autostart *autostart = calloc(1, sizeof(struct autostart));
+         strncpy(autostart->command, value, sizeof autostart->command);
+
+         wl_list_insert(&config->autostarts, &autostart->link);
       }
    }
    return config;

@@ -16,6 +16,7 @@ struct simple_layer_surface {
    struct wl_listener unmap;
    struct wl_listener destroy;
    struct wl_listener surface_commit;
+   struct wl_listener new_popup;
 
    bool mapped;
 
@@ -23,6 +24,7 @@ struct simple_layer_surface {
    struct wlr_box geom;
 };
 
+void arrange_layers(struct simple_output*);
 void layer_new_surface_notify(struct wl_listener*, void*);
 
 #endif

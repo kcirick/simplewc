@@ -18,6 +18,8 @@
 #include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_subcompositor.h>
+#include <wlr/types/wlr_server_decoration.h>
+#include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_xcursor_manager.h>
@@ -38,12 +40,75 @@
 //#include <wlr/types/wlr_fractional_scale_v1.h>
 //
 
+#include "dwl-ipc-unstable-v2-protocol.h"
 #include "globals.h"
+#include "layer.h"
 #include "client.h"
 #include "server.h"
-#include "layer.h"
 #include "action.h"
+#include "ipc.h"
 
+
+//------------------------------------------------------------------------
+void
+setCurrentTag(struct simple_server* server, int tag)
+{
+   say(DEBUG, "setCurrentTag %d", tag);
+   struct simple_output* output = server->cur_output;
+   output->cur_tag = TAGMASK(tag);
+
+   arrange_output(output);
+}
+
+struct simple_output*
+get_output_at(struct simple_server* server, double x, double y)
+{
+   struct wlr_output *output = wlr_output_layout_output_at(server->output_layout, x, y);
+   return output ? output->data : NULL;
+}
+
+void
+print_server_info(struct simple_server* server) 
+{
+   struct simple_output* output;
+   struct simple_client* client;
+
+   wl_list_for_each(output, &server->outputs, link) {
+      say(INFO, "output %s", output->wlr_output->name);
+      say(INFO, " -> cur_output = %u", output == server->cur_output);
+      say(INFO, " -> tag = %u", output->cur_tag);
+      wl_list_for_each(client, &server->clients, link) {
+         say(INFO, " -> client");
+         say(INFO, "    -> client tags = %u", client->tags);
+      }
+   }
+
+   wl_list_for_each(output, &server->outputs, link)
+      dwl_ipc_output_printstatus(output);
+}
+
+static void
+new_decoration_notify(struct wl_listener *listener, void *data)
+{
+   struct wlr_xdg_toplevel_decoration_v1 *decoration = data;
+   wlr_xdg_toplevel_decoration_v1_set_mode(decoration, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+}
+
+void
+arrange_output(struct simple_output* output)
+{
+   say(DEBUG, "arrange_output");
+   struct simple_server* server = output->server;
+   struct simple_client* client;
+
+   wl_list_for_each(client, &server->clients, link) {
+      if(client->output == output){
+         say(DEBUG, ">>> %u", VISIBLEON(client, output));
+         wlr_scene_node_set_enabled(&client->scene_tree->node, VISIBLEON(client, output));
+      }
+   }
+   print_server_info(server);
+}
 
 //--- Output notify functions --------------------------------------------
 static void 
@@ -70,8 +135,10 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
       wlr_output_layout_get_box(server->output_layout, output->wlr_output, &box);
       if(wlr_box_empty(&box))
          say(ERROR, "Failed to get output layout box");
+
+      memset(&output->usable_area, 0, sizeof(output->usable_area));
       output->usable_area = box;
-      say(INFO, " box x=%d / y=%d", box.x, box.y);
+      say(INFO, " box x=%d / y=%d / w=%d / h=%d", box.x, box.y, box.width, box.height);
 
       //arrange_layers(output);
 
@@ -131,6 +198,10 @@ output_destroy_notify(struct wl_listener *listener, void *data)
    say(DEBUG, "output_destroy_notify");
    struct simple_output *output = wl_container_of(listener, output, destroy);
 
+   struct DwlIpcOutput *ipc_output, *ipc_output_tmp;
+   wl_list_for_each_safe(ipc_output, ipc_output_tmp, &output->dwl_ipc_outputs, link)
+      wl_resource_destroy(ipc_output->resource);
+
    wl_list_remove(&output->frame.link);
    wl_list_remove(&output->request_state.link);
    wl_list_remove(&output->destroy.link);
@@ -138,6 +209,7 @@ output_destroy_notify(struct wl_listener *listener, void *data)
    free(output);
 }
 
+//------------------------------------------------------------------------
 static void 
 new_output_notify(struct wl_listener *listener, void *data) 
 {
@@ -174,14 +246,25 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_output->data = output;
    output->server = server;
 
+   wl_list_init(&output->dwl_ipc_outputs);   // ipc addition
+
    LISTEN(&wlr_output->events.frame, &output->frame, output_frame_notify);
    LISTEN(&wlr_output->events.destroy, &output->destroy, output_destroy_notify);
    LISTEN(&wlr_output->events.request_state, &output->request_state, output_request_state_notify);
 
    wl_list_insert(&server->outputs, &output->link);
+   
 
-   for(int i=0; i<4; i++)
-      wl_list_init(&output->layers[i]);
+   for(int i=0; i<N_LAYER_SHELL_LAYERS; i++)
+      wl_list_init(&output->layer_shells[i]);
+   
+   wlr_scene_node_lower_to_bottom(&server->layer_tree[LyrBottom]->node);
+   wlr_scene_node_lower_to_bottom(&server->layer_tree[LyrBg]->node);
+   wlr_scene_node_raise_to_top(&server->layer_tree[LyrTop]->node);
+   wlr_scene_node_raise_to_top(&server->layer_tree[LyrOverlay]->node);
+
+   //set default tag
+   output->cur_tag = TAGMASK(0);
 
    struct wlr_output_layout_output *l_output =
       wlr_output_layout_add_auto(server->output_layout, wlr_output);
@@ -194,7 +277,7 @@ new_output_notify(struct wl_listener *listener, void *data)
          l_output->x, l_output->y);
 }
 
-//------------------------------------------------------------------------
+//--- Input functions ----------------------------------------------------
 void 
 input_focus_surface(struct simple_server *server, struct wlr_surface *surface) 
 {
@@ -309,8 +392,8 @@ process_cursor_resize(struct simple_server *server, uint32_t time)
    client->geom.width = new_right - new_left;
    client->geom.height = new_bottom - new_top;
 
-   wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
-   set_client_size(client, client->geom);
+   //wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
+   set_client_size_position(client, client->geom);
 }
 
 static void 
@@ -333,6 +416,10 @@ process_cursor_motion(struct simple_server *server, uint32_t time)
    
    if(!client)
       wlr_cursor_set_xcursor(server->cursor, server->cursor_manager, "left_ptr");
+
+   if(client && surface && client->server->config->sloppy_focus){
+      focus_client(client, surface, false);
+   }
 
    if(surface) {
       wlr_seat_pointer_notify_enter(wlr_seat, surface, sx, sy);
@@ -404,7 +491,7 @@ cursor_button_notify(struct wl_listener *listener, void *data)
       return;
    }
    
-   focus_client(client, surface);
+   focus_client(client, surface, true);
 }
 
 static void 
@@ -539,7 +626,7 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
 
    // create a scene graph used to lay out windows
    server->scene = wlr_scene_create();
-   for(int i=0; i<4; i++)
+   for(int i=0; i<NLayers; i++)
       server->layer_tree[i] = wlr_scene_tree_create(&server->scene->tree);
 
    // create renderer
@@ -553,7 +640,7 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
       say(ERROR, "Unable to create wlr_allocator");
 
    // create compositor
-   server->compositor = wlr_compositor_create(server->display, 5, server->renderer);
+   server->compositor = wlr_compositor_create(server->display, COMPOSITOR_VERSION, server->renderer);
    wlr_subcompositor_create(server->display);
    wlr_data_device_manager_create(server->display);
    /*
@@ -625,8 +712,16 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
    // idle_inhibit_manager = ...
    // LISTEN ...
 
+   // Use decoration protocols to negotiate server-side decorations
+   wlr_server_decoration_manager_set_default_mode(wlr_server_decoration_manager_create(server->display),
+         WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
+   server->xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(server->display);
+   LISTEN(&server->xdg_decoration_manager->events.new_toplevel_decoration, &server->new_decoration, new_decoration_notify);
+
    struct wlr_presentation *presentation = wlr_presentation_create(server->display, server->backend);
    wlr_scene_set_presentation(server->scene, presentation);
+
+   wl_global_create(server->display, &zdwl_ipc_manager_v2_interface, 2, NULL, dwl_ipc_manager_bind);
 
 #if XWAYLAND
    if(!(server->xwayland = wlr_xwayland_create(server->display, server->compositor, true))) {
@@ -663,6 +758,11 @@ startServer(struct simple_server *server)
    else 
       say(INFO, " -> XWayland is running on display %s", server->xwayland->display_name);
 #endif
+
+   // choose initial output based on cursor position
+   server->cur_output = get_output_at(server, server->cursor->x, server->cursor->y);
+
+   print_server_info(server);
 }
 
 void 
@@ -673,8 +773,8 @@ cleanupServer(struct simple_server *server)
    server->xwayland = NULL;
    wlr_xwayland_destroy(server->xwayland);
 #endif
-   if(server->backend)
-      wlr_backend_destroy(server->backend);
+   //if(server->backend)
+   //   wlr_backend_destroy(server->backend);
 
    wl_display_destroy_clients(server->display);
    wlr_xcursor_manager_destroy(server->cursor_manager);

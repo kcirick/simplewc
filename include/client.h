@@ -7,14 +7,11 @@ struct simple_client {
    struct simple_output *output;
    enum client_type type;
 
-   //struct wlr_surface *surface;
    struct wlr_xdg_surface *xdg_surface;
 #if XWAYLAND
    struct wlr_xwayland_surface *xwayland_surface;
 #endif
-   //struct wlr_xdg_toplevel *xdg_toplevel;
    struct wlr_scene_tree *scene_tree;
-   struct wlr_scene_node *scene_node;
    struct wlr_scene_rect *border[4]; // top, bottom, left, right
 
    struct wl_listener map;
@@ -35,18 +32,24 @@ struct simple_client {
    struct wl_listener override_redirect;
 #endif
 
+   uint32_t tags;
+
    bool mapped;
 
    // geometry of the wlr_surface within the view as currently displayed
    struct wlr_box geom;
 };
+   
+void toggleClientTag(struct simple_client*, int);
 
+struct simple_client* get_top_client_from_output(struct simple_output*);
 struct simple_client* get_client_at(struct simple_server*, double, double, struct wlr_surface**, double*, double*);
-void focus_client(struct simple_client*, struct wlr_surface *surface);
+int get_client_from_surface(struct wlr_surface*, struct simple_client**, struct simple_layer_surface**);
+void focus_client(struct simple_client*, struct wlr_surface *surface, bool);
 void begin_interactive(struct simple_client*, enum cursor_mode, uint32_t);
 
 void get_client_size(struct simple_client*, struct wlr_box*);
-void set_client_size(struct simple_client*, struct wlr_box);
+void set_client_size_position(struct simple_client*, struct wlr_box);
 void set_client_border_colour(struct simple_client*, int);
 
 void xdg_new_surface_notify(struct wl_listener*, void*);

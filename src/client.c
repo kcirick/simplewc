@@ -1,4 +1,3 @@
-//#include <unistd.h>
 #include <assert.h>
 #include <wayland-server-core.h>
 #include <wlr/backend/session.h>
@@ -13,10 +12,22 @@
 #endif
 
 #include "globals.h"
+#include "layer.h"
 #include "client.h"
 #include "server.h"
-#include "layer.h"
 
+
+void
+toggleClientTag(struct simple_client *client, int tag){
+   say(DEBUG, "toggleClientTag");
+   // ...
+   if(!client) return;
+
+   // Do not toggle if result is NULL
+   if(tag == client->tags) return;
+
+   client->tags ^= TAGMASK(tag);
+}
 
 void 
 begin_interactive(struct simple_client *client, enum cursor_mode mode, uint32_t edges)
@@ -38,11 +49,11 @@ begin_interactive(struct simple_client *client, enum cursor_mode mode, uint32_t 
    server->cursor_mode = mode;
 
    if(mode == CURSOR_MOVE) {
-      say(INFO, "CURSOR_MOVE");
+      //say(INFO, "CURSOR_MOVE");
       server->grab_x = server->cursor->x - client->geom.x;
       server->grab_y = server->cursor->y - client->geom.y;
    } else {
-      say(INFO, "CURSOR_RESIZE");
+      //say(INFO, "CURSOR_RESIZE");
       struct wlr_box geo_box;
       if(client->type==XDG_SHELL_CLIENT) {
          wlr_xdg_surface_get_geometry(client->xdg_surface, &geo_box);
@@ -62,6 +73,18 @@ begin_interactive(struct simple_client *client, enum cursor_mode mode, uint32_t 
    }  
 }
 
+struct simple_client*
+get_top_client_from_output(struct simple_output* output)
+{
+   struct simple_client *client;
+   struct simple_server *server = output->server;
+   wl_list_for_each(client, &server->clients, link)
+      if(VISIBLEON(client, output))
+         return client;
+   
+   return NULL;
+}
+
 struct simple_client* 
 get_client_at(struct simple_server *server, double lx, double ly, struct wlr_surface **surface, double *sx, double *sy) 
 {
@@ -79,8 +102,13 @@ get_client_at(struct simple_server *server, double lx, double ly, struct wlr_sur
    while(tree != NULL && tree->node.data==NULL)
       tree = tree->node.parent;
 
+   if(!tree) return NULL;
+
+   struct simple_client* client = tree->node.data;
+   if(!client) return NULL;
+
    //say(DEBUG, "client_at(): found node parent");
-   if(((struct simple_client*)tree->node.data)->type == LAYER_SHELL_CLIENT){
+   if(client->type == LAYER_SHELL_CLIENT){
       return NULL;
    } else
       return tree->node.data;
@@ -122,7 +150,7 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
 
    struct wlr_layer_surface_v1 *ls = wlr_layer_surface_v1_try_from_wlr_surface(root_surface);
    if(ls) {
-      say(DEBUG, "XS");
+      say(DEBUG, "LAYER");
       *lsurface = ls->data; 
       type = (*lsurface)->type;
       return type;
@@ -142,6 +170,7 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
             if(!tmp_s) {
                return get_client_from_surface(s->popup->parent, client, lsurface);
             }
+
             s = tmp_s;
             break;
          case WLR_XDG_SURFACE_ROLE_TOPLEVEL:
@@ -172,10 +201,11 @@ get_client_size(struct simple_client *client, struct wlr_box *geom)
 }
 
 void 
-set_client_size(struct simple_client *client, struct wlr_box geom) 
+set_client_size_position(struct simple_client *client, struct wlr_box geom) 
 {
    struct simple_config *config = client->server->config;
    if(client->type==XDG_SHELL_CLIENT){
+      wlr_scene_node_set_position(&client->scene_tree->node, geom.x, geom.y);
       wlr_xdg_toplevel_set_size(client->xdg_surface->toplevel, geom.width, geom.height);
 #if XWAYLAND
    } else {
@@ -187,13 +217,19 @@ set_client_size(struct simple_client *client, struct wlr_box geom)
 #endif
    }
    //borders
-   wlr_scene_rect_set_size(client->border[0], client->geom.width, config->border_width);
-   wlr_scene_rect_set_size(client->border[1], client->geom.width, config->border_width);
-   wlr_scene_node_set_position(&client->border[1]->node, 0, client->geom.height - config->border_width);
-   wlr_scene_rect_set_size(client->border[2], config->border_width, client->geom.height - 2 * config->border_width);
-   wlr_scene_node_set_position(&client->border[2]->node, 0, config->border_width);
-   wlr_scene_rect_set_size(client->border[3], config->border_width, client->geom.height - 2 * config->border_width);
-   wlr_scene_node_set_position(&client->border[3]->node, client->geom.width - config->border_width, config->border_width);
+   int bw = config->border_width;
+   //top
+   wlr_scene_rect_set_size(client->border[0], client->geom.width, bw);
+   wlr_scene_node_set_position(&client->border[0]->node, 0, -bw);
+   //bottom
+   wlr_scene_rect_set_size(client->border[1], client->geom.width, bw);
+   wlr_scene_node_set_position(&client->border[1]->node, 0, client->geom.height);
+   //left
+   wlr_scene_rect_set_size(client->border[2], bw, client->geom.height + 2 * bw);
+   wlr_scene_node_set_position(&client->border[2]->node, -bw, -bw);
+   //right
+   wlr_scene_rect_set_size(client->border[3], bw, client->geom.height + 2 * bw);
+   wlr_scene_node_set_position(&client->border[3]->node, client->geom.width, -bw);
 }
 
 void 
@@ -205,22 +241,22 @@ set_client_border_colour(struct simple_client *client, int colour)
 }
 
 void 
-focus_client(struct simple_client *client, struct wlr_surface *surface) 
+focus_client(struct simple_client *client, struct wlr_surface *surface, bool raise) 
 {
-   say(DEBUG, "focus_client()");
+   //say(DEBUG, "focus_client()");
    if(!client) return;
 
-   say(DEBUG, "HERE 10");
    struct simple_server *server = client->server;
    int old_client_type;
    struct simple_client* old_client=NULL;
    struct simple_layer_surface* old_lsurface = NULL;
 
-   say(DEBUG, "HERE 20");
+   if(raise)
+      wlr_scene_node_raise_to_top(&client->scene_tree->node);
+   
    struct wlr_surface *prev_surface = server->seat->keyboard_state.focused_surface;
    if(prev_surface==surface) return;
 
-   say(DEBUG, "HERE 30");
    if(prev_surface){
       old_client_type = get_client_from_surface(prev_surface, &old_client, &old_lsurface);
       if(old_client_type == XDG_SHELL_CLIENT || old_client_type == XWL_MANAGED_CLIENT){
@@ -229,9 +265,7 @@ focus_client(struct simple_client *client, struct wlr_surface *surface)
          set_client_border_colour(old_client, UNFOCUSED);
       }
    }
-   say(DEBUG, "HERE 40");
    
-   wlr_scene_node_raise_to_top(&client->scene_tree->node);
    wl_list_remove(&client->link);
    wl_list_insert(&client->server->clients, &client->link);
 
@@ -247,6 +281,13 @@ set_initial_geometry(struct simple_client* client)
    if(wlr_box_empty(&client->geom))
       get_client_size(client, &client->geom);
 
+   struct simple_output* output = client->server->cur_output;
+   struct wlr_box bounds = output->usable_area;
+   struct simple_config *config = client->server->config;
+
+   if(client->geom.x<bounds.x+config->border_width) client->geom.x=bounds.x + config->border_width;
+   if(client->geom.y<bounds.y+config->border_width) client->geom.y=bounds.y + config->border_width;
+
    say(DEBUG, " -> Initial geometry : %d %d %d %d", client->geom.x, client->geom.y, client->geom.width, client->geom.height);
    // borders
    for(int i=0; i<4; i++){
@@ -254,7 +295,8 @@ set_initial_geometry(struct simple_client* client)
       client->border[i]->node.data = client;
    }
 
-   set_client_size(client, client->geom);
+   set_client_size_position(client, client->geom);
+   //wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
 }
 
 // --- Common notify functions -------------------------------------------
@@ -265,21 +307,29 @@ map_notify(struct wl_listener *listener, void *data)
    struct simple_client *client = wl_container_of(listener, client, map);
    if(client->mapped) return;
 
-   wl_list_insert(&client->server->clients, &client->link);
+   struct simple_server *server = client->server;
+   wl_list_insert(&server->clients, &client->link);
    client->mapped = true;
 
    struct wlr_scene_tree *tree = client->type==XDG_SHELL_CLIENT ?
       wlr_scene_xdg_surface_create(client->scene_tree, client->xdg_surface) :
       wlr_scene_subsurface_tree_create(client->scene_tree, client->xwayland_surface->surface);
    if(!tree) return;
-   client->scene_node = &tree->node;
 
    set_initial_geometry(client);
-   struct wlr_output *output = wlr_output_layout_output_at(client->server->output_layout, client->geom.x, client->geom.y);
-   if(output)
-      client->output = output->data;
 
-   focus_client(client, client->type==XDG_SHELL_CLIENT ? client->xdg_surface->surface : client->xwayland_surface->surface);
+   struct wlr_output *output = wlr_output_layout_output_at(server->output_layout, client->geom.x, client->geom.y);
+   if(output){
+      struct simple_output* op = output->data;
+      client->output = op;
+      client->tags = op->cur_tag;
+   }
+
+   wlr_scene_node_reparent(&client->scene_tree->node, server->layer_tree[LyrClient]);
+
+   focus_client(client, client->type==XDG_SHELL_CLIENT ? client->xdg_surface->surface : client->xwayland_surface->surface, true);
+
+   print_server_info(server);
 }
 
 static void 
@@ -341,7 +391,7 @@ xdg_tl_request_resize_notify(struct wl_listener *listener, void *data)
 void 
 xdg_new_surface_notify(struct wl_listener *listener, void *data)
 {
-   say(DEBUG, "new_xdg_surface_notify");
+   say(INFO, "new_xdg_surface_notify");
    struct simple_server *server = wl_container_of(listener, server, xdg_new_surface);
    struct wlr_xdg_surface *xdg_surface = data;
    struct simple_client* pclient;
@@ -349,24 +399,20 @@ xdg_new_surface_notify(struct wl_listener *listener, void *data)
 
    // add xdg popups to the scene graph
    if(xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
+      
       struct wlr_box box;
       int type = get_client_from_surface(xdg_surface->surface, &pclient, &lsurface);
       if(!xdg_surface->popup->parent || type<0)
          return;
-      xdg_surface->surface->data = wlr_scene_xdg_surface_create(
-            type == LAYER_SHELL_CLIENT ? lsurface->scene_tree : pclient->scene_tree, xdg_surface);
+      //struct wlr_scene_tree *tree = wlr_scene_xdg_surface_create(
+      //      type == LAYER_SHELL_CLIENT ? lsurface->scene_tree : pclient->scene_tree, xdg_surface);
+      struct wlr_scene_tree *tree = wlr_scene_xdg_surface_create(xdg_surface->popup->parent->data, xdg_surface);
+      xdg_surface->surface->data = tree;
       box = type == LAYER_SHELL_CLIENT ? lsurface->output->usable_area : pclient->output->usable_area;
-      //box.x -= ...
-      //box.y -= ...
+      box.x -= (type==LAYER_SHELL_CLIENT ? lsurface->geom.x : pclient->geom.x); 
+      box.y -= (type==LAYER_SHELL_CLIENT ? lsurface->geom.y : pclient->geom.y);
       wlr_xdg_popup_unconstrain_from_box(xdg_surface->popup, &box);
-      /*
-      struct wlr_xdg_surface *parent = wlr_xdg_surface_try_from_wlr_surface(xdg_surface->popup->parent);
-      assert(parent != NULL);
-      struct simple_client *pclient = parent->data;
-      struct wlr_scene_tree *parent_tree = pclient->scene_tree;
-      wlr_scene_xdg_surface_create(parent_tree, xdg_surface);
-      xdg_surface->data = pclient; 
-      */
+      
       return;
    }
    assert(xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL);
@@ -376,9 +422,10 @@ xdg_new_surface_notify(struct wl_listener *listener, void *data)
    client->server = server;
    client->type = XDG_SHELL_CLIENT;
    client->xdg_surface = xdg_surface;
+
    client->scene_tree = wlr_scene_tree_create(&client->server->scene->tree);
    client->scene_tree->node.data = client;
-   //xdg_surface->data = client->scene_tree;
+   xdg_surface->surface->data = client->scene_tree;
    xdg_surface->data = client;
 
    LISTEN(&xdg_surface->surface->events.map, &client->map, map_notify);
@@ -467,13 +514,13 @@ xwl_new_surface_notify(struct wl_listener *listener, void *data)
 
    // Create simple_client for this surface 
    struct simple_client *xwl_client = calloc(1, sizeof(struct simple_client));
-
    xwl_client->server = server;
    xwl_client->type = XWL_MANAGED_CLIENT;
    xwl_client->xwayland_surface = xsurface;
+
    xwl_client->scene_tree = wlr_scene_tree_create(&xwl_client->server->scene->tree);
    xwl_client->scene_tree->node.data = xwl_client;
-   //xsurface->data = xwl_client->scene_tree;
+   xsurface->surface->data = xwl_client->scene_tree;
    xsurface->data = xwl_client;
 
    LISTEN(&xsurface->events.associate, &xwl_client->associate, xwl_associate_notify);
