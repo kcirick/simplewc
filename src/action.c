@@ -32,13 +32,14 @@ key_function(struct simple_server *server, struct keymap *keymap)
    get_client_from_surface(surface, &client, NULL);
    if(client && keymap->keyfn==CLIENT) {
       if(!strcmp(keymap->argument, "toggle_tag"))  toggleClientTag(client, keymap->keysym-XKB_KEY_1);
+      if(!strcmp(keymap->argument, "cycle"))       cycleClients(client->output);
       if(!strcmp(keymap->argument, "move")){
          say(DEBUG, " >>> move client");
          if(keymap->keysym==XKB_KEY_Left)    client->geom.x-=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Right)   client->geom.x+=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Up)      client->geom.y-=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Down)    client->geom.y+=server->config->moveresize_step;
-         set_client_size_position(client, client->geom);
+         set_client_geometry(client, client->geom);
       }
       if(!strcmp(keymap->argument, "resize")){
          say(DEBUG, " >>> resize client");
@@ -46,7 +47,7 @@ key_function(struct simple_server *server, struct keymap *keymap)
          if(keymap->keysym==XKB_KEY_Right)   client->geom.width+=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Up)      client->geom.height-=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Down)    client->geom.height+=server->config->moveresize_step;
-         set_client_size_position(client, client->geom);
+         set_client_geometry(client, client->geom);
       }
       // ...
       arrange_output(server->cur_output);

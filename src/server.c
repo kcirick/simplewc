@@ -50,6 +50,50 @@
 
 
 //------------------------------------------------------------------------
+static void
+client_outline_destroy_notify(struct wl_listener *listener, void *data)
+{
+   struct client_outline* outline = wl_container_of(listener, outline, destroy);
+   wl_list_remove(&outline->destroy.link);
+   free(outline);
+}
+
+struct client_outline*
+client_outline_create(struct wlr_scene_tree *parent, float* border_colour, int line_width)
+{
+   struct client_outline* outline = calloc(1, sizeof(struct client_outline));
+   outline->line_width = line_width;
+   outline->tree = wlr_scene_tree_create(parent);
+
+   outline->top = wlr_scene_rect_create(outline->tree, 0, 0, border_colour);
+   outline->bottom = wlr_scene_rect_create(outline->tree, 0, 0, border_colour);
+   outline->left = wlr_scene_rect_create(outline->tree, 0, 0, border_colour);
+   outline->right = wlr_scene_rect_create(outline->tree, 0, 0, border_colour);
+
+   LISTEN(&outline->tree->node.events.destroy, &outline->destroy, client_outline_destroy_notify);
+   
+   return outline;
+}
+
+void
+client_outline_set_size(struct client_outline* outline, int width, int height) {
+   //borders
+   int bw = outline->line_width;
+   //top
+   wlr_scene_rect_set_size(outline->top, width, bw);
+   wlr_scene_node_set_position(&outline->top->node, 0, -bw);
+   //bottom
+   wlr_scene_rect_set_size(outline->bottom, width, bw);
+   wlr_scene_node_set_position(&outline->bottom->node, 0, height);
+   //left
+   wlr_scene_rect_set_size(outline->left, bw, height + 2 * bw);
+   wlr_scene_node_set_position(&outline->left->node, -bw, -bw);
+   //right
+   wlr_scene_rect_set_size(outline->right, bw, height + 2 * bw);
+   wlr_scene_node_set_position(&outline->right->node, width, -bw);
+}
+
+//------------------------------------------------------------------------
 void
 setCurrentTag(struct simple_server* server, int tag)
 {
@@ -295,8 +339,30 @@ static void
 kb_modifiers_notify(struct wl_listener *listener, void *data) 
 {
    struct simple_input *keyboard = wl_container_of(listener, keyboard, kb_modifiers);
+   struct simple_server *server = keyboard->server;
+   struct wlr_keyboard* wlr_kb = keyboard->keyboard;
 
-   wlr_seat_set_keyboard(keyboard->server->seat, keyboard->keyboard);
+   if(keyboard->server->grabbed_client) {
+      xkb_mod_index_t i;
+      bool mod_pressed = false;
+      for(i=0; i<xkb_keymap_num_mods(wlr_kb->keymap); i++){
+         if(xkb_state_mod_index_is_active(wlr_kb->xkb_state, i, XKB_STATE_MODS_DEPRESSED))
+            mod_pressed = true;
+      }
+      if(!mod_pressed) {
+         say(DEBUG, ">> HHH");
+         struct simple_client* client = keyboard->server->grabbed_client;
+         if(server->grabbed_client_outline){
+            wlr_scene_node_destroy(&server->grabbed_client_outline->tree->node);
+            server->grabbed_client_outline=NULL;
+         }
+
+         focus_client(client, client->type==XDG_SHELL_CLIENT ? client->xdg_surface->surface : client->xwayland_surface->surface, true);
+         keyboard->server->grabbed_client=NULL;
+      }
+   }
+
+   //wlr_seat_set_keyboard(keyboard->server->seat, keyboard->keyboard);
    wlr_seat_keyboard_notify_modifiers(keyboard->server->seat, &keyboard->keyboard->modifiers);
 }
 
@@ -392,8 +458,7 @@ process_cursor_resize(struct simple_server *server, uint32_t time)
    client->geom.width = new_right - new_left;
    client->geom.height = new_bottom - new_top;
 
-   //wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
-   set_client_size_position(client, client->geom);
+   set_client_geometry(client, client->geom);
 }
 
 static void 

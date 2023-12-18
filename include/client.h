@@ -41,6 +41,7 @@ struct simple_client {
 };
    
 void toggleClientTag(struct simple_client*, int);
+void cycleClients(struct simple_output*);
 
 struct simple_client* get_top_client_from_output(struct simple_output*);
 struct simple_client* get_client_at(struct simple_server*, double, double, struct wlr_surface**, double*, double*);
@@ -48,8 +49,8 @@ int get_client_from_surface(struct wlr_surface*, struct simple_client**, struct 
 void focus_client(struct simple_client*, struct wlr_surface *surface, bool);
 void begin_interactive(struct simple_client*, enum cursor_mode, uint32_t);
 
-void get_client_size(struct simple_client*, struct wlr_box*);
-void set_client_size_position(struct simple_client*, struct wlr_box);
+void get_client_geometry(struct simple_client*, struct wlr_box*);
+void set_client_geometry(struct simple_client*, struct wlr_box);
 void set_client_border_colour(struct simple_client*, int);
 
 void xdg_new_surface_notify(struct wl_listener*, void*);

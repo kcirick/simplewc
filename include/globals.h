@@ -24,13 +24,14 @@
 
 //--- enums -----
 enum MessageType { DEBUG, INFO, WARNING, ERROR, NMSG };
-enum BorderColours { FOCUSED, UNFOCUSED, URGENT, MARKED, FIXED, NBORDERCOL };
+enum BorderColours { FOCUSED, UNFOCUSED, URGENT, MARKED, FIXED, OUTLINE, NBORDERCOL };
 enum KeyFunctions { SPAWN, QUIT, TAG, CLIENT, NFUNC };
 enum MouseContext { CONTEXT_ROOT, CONTEXT_CLIENT, NCONTEXT};
 enum cursor_mode { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE };
 enum client_type { XDG_SHELL_CLIENT, LAYER_SHELL_CLIENT, XWL_MANAGED_CLIENT, XWL_UNMANAGED_CLIENT };
 enum inputType {INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
-enum {LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, NLayers }; // scene layers
+enum layer_type {LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, NLayers }; // scene layers
+enum node_descriptor_type {NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP};
 
 struct simple_config {
    int n_tags;

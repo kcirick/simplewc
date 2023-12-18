@@ -29,6 +29,66 @@ toggleClientTag(struct simple_client *client, int tag){
    client->tags ^= TAGMASK(tag);
 }
 
+void
+cycleClients(struct simple_output *output){
+   /* from dwl:
+   struct simple_client* client, *selected = get_top_client_from_output(output);
+   if(!selected) return;
+
+   wl_list_for_each(client, &selected->link, link) {
+      if(&client->link == &output->server->clients)
+         continue; // wrap past the sentinel node
+      if(VISIBLEON(client, output))
+         break;
+   }
+   */
+
+   // from labwc
+   struct simple_server* server = output->server;
+   struct simple_client* client, *selected = get_top_client_from_output(output);
+   struct wlr_scene_node *node = &selected->scene_tree->node;
+   assert(node->parent);
+
+   struct wl_list *list_head = &node->parent->children;
+   struct wl_list *list_item = &node->link;
+
+   do {
+      list_item = list_item->next;
+      if(list_item==list_head){
+         // start/end of list reached, so roll over
+         list_item = list_item->next;
+      }
+      node = wl_container_of(list_item, node, link);
+      if(!node->data){
+         client=NULL;
+         continue;
+      }
+      client = (struct simple_client*)node->data;
+      if(client && VISIBLEON(client, output)) break; 
+   } while (client != selected);
+   
+   // grab the client
+   server->grabbed_client = client;
+
+   // draw the border
+   struct client_outline* outline = server->grabbed_client_outline;
+   if(!outline){
+      int line_width = 4;
+      outline = client_outline_create(&server->scene->tree, server->config->border_colour[OUTLINE], line_width);
+      wlr_scene_node_place_above(&outline->tree->node, &server->layer_tree[LyrClient]->node);
+      server->grabbed_client_outline = outline;
+   }
+
+   client_outline_set_size(outline, client->geom.width, client->geom.height);
+   wlr_scene_node_set_position(&outline->tree->node, client->geom.x, client->geom.y);
+   //---
+
+   // change stacking order but don't actually focus
+   wl_list_remove(&client->link);
+   wl_list_insert(&client->server->clients, &client->link);
+   //focus_client(client, client->type==XDG_SHELL_CLIENT ? client->xdg_surface->surface : client->xwayland_surface->surface, true);
+}
+
 void 
 begin_interactive(struct simple_client *client, enum cursor_mode mode, uint32_t edges)
 {
@@ -186,7 +246,7 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
 }
 
 void
-get_client_size(struct simple_client *client, struct wlr_box *geom)
+get_client_geometry(struct simple_client *client, struct wlr_box *geom)
 {
    if(client->type==XDG_SHELL_CLIENT){
       wlr_xdg_surface_get_geometry(client->xdg_surface, geom);
@@ -201,7 +261,7 @@ get_client_size(struct simple_client *client, struct wlr_box *geom)
 }
 
 void 
-set_client_size_position(struct simple_client *client, struct wlr_box geom) 
+set_client_geometry(struct simple_client *client, struct wlr_box geom) 
 {
    struct simple_config *config = client->server->config;
    if(client->type==XDG_SHELL_CLIENT){
@@ -210,8 +270,8 @@ set_client_size_position(struct simple_client *client, struct wlr_box geom)
 #if XWAYLAND
    } else {
       wlr_xwayland_surface_configure(client->xwayland_surface, 
-            geom.x + config->border_width, 
-            geom.y + config->border_width, 
+            geom.x, 
+            geom.y, 
             geom.width, 
             geom.height);
 #endif
@@ -279,7 +339,7 @@ void
 set_initial_geometry(struct simple_client* client) 
 {
    if(wlr_box_empty(&client->geom))
-      get_client_size(client, &client->geom);
+      get_client_geometry(client, &client->geom);
 
    struct simple_output* output = client->server->cur_output;
    struct wlr_box bounds = output->usable_area;
@@ -295,8 +355,7 @@ set_initial_geometry(struct simple_client* client)
       client->border[i]->node.data = client;
    }
 
-   set_client_size_position(client, client->geom);
-   //wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
+   set_client_geometry(client, client->geom);
 }
 
 // --- Common notify functions -------------------------------------------
@@ -305,6 +364,11 @@ map_notify(struct wl_listener *listener, void *data)
 {
    say(INFO, "map_notify");
    struct simple_client *client = wl_container_of(listener, client, map);
+   if(client->type==XDG_SHELL_CLIENT)
+      client->xdg_surface->surface->data = client->scene_tree;
+   else
+      client->xwayland_surface->surface->data = client->scene_tree;
+
    if(client->mapped) return;
 
    struct simple_server *server = client->server;
@@ -404,8 +468,6 @@ xdg_new_surface_notify(struct wl_listener *listener, void *data)
       int type = get_client_from_surface(xdg_surface->surface, &pclient, &lsurface);
       if(!xdg_surface->popup->parent || type<0)
          return;
-      //struct wlr_scene_tree *tree = wlr_scene_xdg_surface_create(
-      //      type == LAYER_SHELL_CLIENT ? lsurface->scene_tree : pclient->scene_tree, xdg_surface);
       struct wlr_scene_tree *tree = wlr_scene_xdg_surface_create(xdg_surface->popup->parent->data, xdg_surface);
       xdg_surface->surface->data = tree;
       box = type == LAYER_SHELL_CLIENT ? lsurface->output->usable_area : pclient->output->usable_area;
@@ -425,7 +487,7 @@ xdg_new_surface_notify(struct wl_listener *listener, void *data)
 
    client->scene_tree = wlr_scene_tree_create(&client->server->scene->tree);
    client->scene_tree->node.data = client;
-   xdg_surface->surface->data = client->scene_tree;
+   //xdg_surface->surface->data = client->scene_tree;
    xdg_surface->data = client;
 
    LISTEN(&xdg_surface->surface->events.map, &client->map, map_notify);
@@ -520,7 +582,7 @@ xwl_new_surface_notify(struct wl_listener *listener, void *data)
 
    xwl_client->scene_tree = wlr_scene_tree_create(&xwl_client->server->scene->tree);
    xwl_client->scene_tree->node.data = xwl_client;
-   xsurface->surface->data = xwl_client->scene_tree;
+   //xsurface->surface->data = xwl_client->scene_tree;
    xsurface->data = xwl_client;
 
    LISTEN(&xsurface->events.associate, &xwl_client->associate, xwl_associate_notify);

@@ -57,6 +57,7 @@ void set_defaults(struct simple_config *config){
    colour2rgba("#FF0000", config->border_colour[URGENT]);
    colour2rgba("#00FF00", config->border_colour[MARKED]);
    colour2rgba("#0000FF", config->border_colour[FIXED]);
+   colour2rgba("#FFFFFF", config->border_colour[OUTLINE]);
 }
 
 struct simple_config * readConfiguration(char* filename) {
@@ -121,6 +122,8 @@ struct simple_config * readConfiguration(char* filename) {
          colour2rgba(value, config->border_colour[MARKED]);
       if(!strcmp(id, "border_colour_fixed")) 
          colour2rgba(value, config->border_colour[FIXED]);
+      if(!strcmp(id, "border_colour_outline")) 
+         colour2rgba(value, config->border_colour[OUTLINE]);
 
       if(!strcmp(id, "KEY")){
          char binding[32];

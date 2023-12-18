@@ -61,6 +61,7 @@ struct simple_server {
    struct wl_listener request_set_selection;
 
    struct simple_client *grabbed_client;
+   struct client_outline *grabbed_client_outline;
    double grab_x, grab_y;
    struct wlr_box grab_box;
    uint32_t resize_edges;
@@ -95,6 +96,21 @@ struct simple_input {
    struct wl_listener kb_key;
    struct wl_listener destroy;
 };
+
+struct client_outline {
+   struct wlr_scene_tree *tree;
+   int line_width;
+
+   struct wlr_scene_rect *top;
+   struct wlr_scene_rect *bottom;
+   struct wlr_scene_rect *left;
+   struct wlr_scene_rect *right;
+
+   struct wl_listener destroy;
+};
+
+struct client_outline* client_outline_create(struct wlr_scene_tree*, float*, int);
+void client_outline_set_size(struct client_outline*, int, int);
 
 void print_server_info(struct simple_server*);
 void setCurrentTag(struct simple_server*, int);
