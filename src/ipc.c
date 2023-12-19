@@ -112,13 +112,13 @@ dwl_ipc_output_printstatus_to(struct DwlIpcOutput *ipc_output)
    for (tag = 0 ; tag < server->config->n_tags; tag++) {
       numclients = state = focused_client = 0;
 		tagmask = 1 << tag;
-		if ((tagmask & output->cur_tag) != 0)
+		if ((tagmask & output->visible_tags) != 0)
 			state |= ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE;
 
 		wl_list_for_each(c, &server->clients, link) {
 			if (c->output != output)
 				continue;
-			if (!(c->tags & tagmask))
+			if (!(c->tag & tagmask))
 				continue;
 			if (c == focused)
 				focused_client = 1;
@@ -164,11 +164,11 @@ dwl_ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *res
 	if (!selected_client)
 		return;
 
-	newtags = (selected_client->tags & and_tags) ^ xor_tags;
+	newtags = (selected_client->tag & and_tags) ^ xor_tags;
 	if (!newtags)
 		return;
 
-	selected_client->tags = newtags;
+	selected_client->tag = newtags;
 	//focusclient(get_top_client_from_output(server->cur_output), 1);
 	arrange_output(server->cur_output);
 	print_server_info(server);
@@ -212,13 +212,14 @@ dwl_ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, 
    struct simple_server *server = output->server;
 
 	//if (!newtags || newtags == output->tagset[monitor->seltags])
-	if (!newtags || newtags == output->cur_tag)
+	if (!newtags || newtags == output->visible_tags)
 		return;
 	//if (toggle_tagset)
 	//	monitor->seltags ^= 1;
 
 	//output->tagset[monitor->seltags] = newtags;
-	output->cur_tag = newtags;
+	output->visible_tags = newtags;
+   if(toggle_tagset) output->current_tag = newtags;
 	//focusclient(focustop(monitor), 1);
 	arrange_output(output);
 	print_server_info(server);

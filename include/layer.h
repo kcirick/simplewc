@@ -5,7 +5,7 @@ struct simple_layer_surface {
    struct wl_list link;
    struct simple_server *server;
    struct simple_output *output;
-   enum client_type type;
+   enum ClientType type;
 
    //struct wlr_layer_surface_v1 *layer_surface;
    struct wlr_scene_layer_surface_v1 *scene_layer_surface;

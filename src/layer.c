@@ -13,7 +13,7 @@
 #include "client.h"
 #include "server.h"
 
-//map from ZWLR_LAYER_SHELL_* constants to Lyr* enum
+//map from ZWLR_LAYER_SHELL_* constants to LayerType enum
 static const int layermap[] = {LyrBg, LyrBottom, LyrTop, LyrOverlay };
 
 void 
@@ -103,14 +103,13 @@ layer_surface_unmap_notify(struct wl_listener *listener, void *data)
    if(wlr_lsurface->output && (lsurface->output = wlr_lsurface->output->data))
       arrange_layers(lsurface->output);
    if(wlr_lsurface->surface == lsurface->server->seat->keyboard_state.focused_surface)
-      focus_client(get_top_client_from_output(lsurface->server->cur_output), wlr_lsurface->surface, false);
+      focus_client(get_top_client_from_output(lsurface->server->cur_output), false);
 }
 
 static void 
 layer_surface_commit_notify(struct wl_listener *listener, void *data) 
 {
-   //
-   say(INFO, "layer_surface_commit_notify");
+   //say(INFO, "layer_surface_commit_notify");
 
    struct simple_layer_surface *lsurface = wl_container_of(listener, lsurface, surface_commit);
    struct wlr_layer_surface_v1 *wlr_lsurface = lsurface->scene_layer_surface->layer_surface;

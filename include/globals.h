@@ -2,17 +2,16 @@
 #define GLOBALS_H
 
 #include <stdio.h>
-#include <stdbool.h>
 #include <stdlib.h>
-#include <string.h>
 
-#include <wlr/util/log.h>
+#include <xkbcommon/xkbcommon.h>
 
 #define MAX_TAGS 9
 
 #define XDG_SHELL_VERSION (3)
 #define LAYER_SHELL_VERSION (4)
 #define COMPOSITOR_VERSION (5)
+#define FRAC_SCALE_VERSION (1)
 
 #define N_LAYER_SHELL_LAYERS 4
 
@@ -20,18 +19,19 @@
 #define LISTEN(E, L, H)    wl_signal_add((E), ((L)->notify = (H), (L)))
 #define LENGTH(X)          (sizeof X / sizeof X[0])
 #define TAGMASK(T)         (1 << (T))
-#define VISIBLEON(C, O)    ((O) && (C)->output==(O) && ((C)->tags & (O)->cur_tag)) 
+#define VISIBLEON(C, O)    ((O) && (C)->output==(O) && ((C)->fixed || ((C)->tag & (O)->visible_tags)))
 
 //--- enums -----
-enum MessageType { DEBUG, INFO, WARNING, ERROR, NMSG };
-enum BorderColours { FOCUSED, UNFOCUSED, URGENT, MARKED, FIXED, OUTLINE, NBORDERCOL };
-enum KeyFunctions { SPAWN, QUIT, TAG, CLIENT, NFUNC };
-enum MouseContext { CONTEXT_ROOT, CONTEXT_CLIENT, NCONTEXT};
-enum cursor_mode { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE };
-enum client_type { XDG_SHELL_CLIENT, LAYER_SHELL_CLIENT, XWL_MANAGED_CLIENT, XWL_UNMANAGED_CLIENT };
-enum inputType {INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
-enum layer_type {LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, NLayers }; // scene layers
-enum node_descriptor_type {NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP};
+enum BorderColours   { FOCUSED, UNFOCUSED, URGENT, MARKED, FIXED, OUTLINE, NBORDERCOL };
+enum KeyFunctions    { SPAWN, QUIT, TAG, CLIENT, NFUNC };
+enum MouseContext    { CONTEXT_ROOT, CONTEXT_CLIENT, NCONTEXT};
+enum CursorMode      { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE };
+
+enum MessageType        { DEBUG, INFO, WARNING, ERROR, NMSG };
+enum ClientType         { XDG_SHELL_CLIENT, LAYER_SHELL_CLIENT, XWL_MANAGED_CLIENT, XWL_UNMANAGED_CLIENT };
+enum InputType          {INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
+enum LayerType          {LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, LyrLock, NLayers }; // scene layers
+enum NodeDescriptorType {NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP};
 
 struct simple_config {
    int n_tags;

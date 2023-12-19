@@ -1,3 +1,4 @@
+#include <string.h>
 #include <wayland-server-core.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_scene.h>
@@ -21,9 +22,10 @@ key_function(struct simple_server *server, struct keymap *keymap)
 
    //--- TAG -----
    if(keymap->keyfn==TAG){
-      if(!strcmp(keymap->argument, "prev"))     setCurrentTag(server, /*curtag*/-1);
-      if(!strcmp(keymap->argument, "next"))     setCurrentTag(server, /*curtag*/+1);
-      if(!strcmp(keymap->argument, "select"))   setCurrentTag(server, keymap->keysym-XKB_KEY_1);
+      if(!strcmp(keymap->argument, "prev"))     setCurrentTag(server, /*curtag*/-1, false);
+      if(!strcmp(keymap->argument, "next"))     setCurrentTag(server, /*curtag*/+1, false);
+      if(!strcmp(keymap->argument, "select"))   setCurrentTag(server, keymap->keysym-XKB_KEY_1, false);
+      if(!strcmp(keymap->argument, "toggle"))   setCurrentTag(server, keymap->keysym-XKB_KEY_1, true);
    }
 
    //--- CLIENT -----
@@ -31,10 +33,10 @@ key_function(struct simple_server *server, struct keymap *keymap)
    struct simple_client* client;
    get_client_from_surface(surface, &client, NULL);
    if(client && keymap->keyfn==CLIENT) {
-      if(!strcmp(keymap->argument, "toggle_tag"))  toggleClientTag(client, keymap->keysym-XKB_KEY_1);
-      if(!strcmp(keymap->argument, "cycle"))       cycleClients(client->output);
+      if(!strcmp(keymap->argument, "send_to_tag"))    sendClientToTag(client, keymap->keysym-XKB_KEY_1);
+      if(!strcmp(keymap->argument, "cycle"))          cycleClients(client->output);
+      if(!strcmp(keymap->argument, "toggle_fixed"))   toggleClientFixed(client);
       if(!strcmp(keymap->argument, "move")){
-         say(DEBUG, " >>> move client");
          if(keymap->keysym==XKB_KEY_Left)    client->geom.x-=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Right)   client->geom.x+=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Up)      client->geom.y-=server->config->moveresize_step;
@@ -42,7 +44,6 @@ key_function(struct simple_server *server, struct keymap *keymap)
          set_client_geometry(client, client->geom);
       }
       if(!strcmp(keymap->argument, "resize")){
-         say(DEBUG, " >>> resize client");
          if(keymap->keysym==XKB_KEY_Left)    client->geom.width-=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Right)   client->geom.width+=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Up)      client->geom.height-=server->config->moveresize_step;

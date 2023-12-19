@@ -1,5 +1,5 @@
 VERSION = 0.1
-TARGET  = swwm 
+TARGET  = swc 
 
 CC = gcc
 MY_CFLAGS = $(CFLAGS) -g -Wall -DVERSION=\"$(VERSION)\" \

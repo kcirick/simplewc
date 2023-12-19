@@ -10,6 +10,8 @@
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_data_device.h>
+#include <wlr/types/wlr_idle_inhibit_v1.h>
+#include <wlr/types/wlr_idle_notify_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_matrix.h>
 #include <wlr/types/wlr_output.h>
@@ -17,6 +19,7 @@
 #include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_scene.h>
+#include <wlr/types/wlr_session_lock_v1.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_server_decoration.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
@@ -24,20 +27,21 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/util/edges.h>
+#include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 #if XWAYLAND
 #include <wlr/xwayland.h>
 #endif
 
 //
-//#include <wlr/types/wlr_export_dmabuf_v1.h>
-//#include <wlr/types/wlr_screencopy_v1.h>
-//#include <wlr/types/wlr_data_control_v1.h>
-//#include <wlr/types/wlr_primary_selection.h>
-//#include <wlr/types/wlr_primary_selection_v1.h>
-//#include <wlr/types/wlr_viewporter.h>
-//#include <wlr/types/wlr_single_pixel_buffer_v1.h>
-//#include <wlr/types/wlr_fractional_scale_v1.h>
+#include <wlr/types/wlr_export_dmabuf_v1.h>
+#include <wlr/types/wlr_screencopy_v1.h>
+#include <wlr/types/wlr_data_control_v1.h>
+#include <wlr/types/wlr_primary_selection.h>
+#include <wlr/types/wlr_primary_selection_v1.h>
+#include <wlr/types/wlr_viewporter.h>
+#include <wlr/types/wlr_single_pixel_buffer_v1.h>
+#include <wlr/types/wlr_fractional_scale_v1.h>
 //
 
 #include "dwl-ipc-unstable-v2-protocol.h"
@@ -49,7 +53,7 @@
 #include "ipc.h"
 
 
-//------------------------------------------------------------------------
+//--- client outline procedures ------------------------------------------
 static void
 client_outline_destroy_notify(struct wl_listener *listener, void *data)
 {
@@ -95,11 +99,14 @@ client_outline_set_size(struct client_outline* outline, int width, int height) {
 
 //------------------------------------------------------------------------
 void
-setCurrentTag(struct simple_server* server, int tag)
+setCurrentTag(struct simple_server* server, int tag, bool toggle)
 {
    say(DEBUG, "setCurrentTag %d", tag);
    struct simple_output* output = server->cur_output;
-   output->cur_tag = TAGMASK(tag);
+   if(toggle)
+      output->visible_tags ^= TAGMASK(tag);
+   else 
+      output->visible_tags = output->current_tag = TAGMASK(tag);
 
    arrange_output(output);
 }
@@ -120,10 +127,11 @@ print_server_info(struct simple_server* server)
    wl_list_for_each(output, &server->outputs, link) {
       say(INFO, "output %s", output->wlr_output->name);
       say(INFO, " -> cur_output = %u", output == server->cur_output);
-      say(INFO, " -> tag = %u", output->cur_tag);
+      say(INFO, " -> tag = vis:%u / cur:%u", output->visible_tags, output->current_tag);
       wl_list_for_each(client, &server->clients, link) {
          say(INFO, " -> client");
-         say(INFO, "    -> client tags = %u", client->tags);
+         say(INFO, "    -> client tag = %u", client->tag);
+         say(INFO, "    -> client fixed = %b", client->fixed);
       }
    }
 
@@ -131,11 +139,23 @@ print_server_info(struct simple_server* server)
       dwl_ipc_output_printstatus(output);
 }
 
-static void
-new_decoration_notify(struct wl_listener *listener, void *data)
+void
+check_idle_inhibitor(struct simple_server* server)
 {
-   struct wlr_xdg_toplevel_decoration_v1 *decoration = data;
-   wlr_xdg_toplevel_decoration_v1_set_mode(decoration, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+   int inhibited=0, lx, ly;
+   struct wlr_idle_inhibitor_v1 *inhibitor;
+   bool bypass_surface_visibility = 0; // 1 means idle inhibitors will disable idle tracking 
+                                       // even if its surface isn't visible (from dwl)
+   wl_list_for_each(inhibitor, &server->idle_inhibit_manager->inhibitors, link) {
+      struct wlr_surface *surface = wlr_surface_get_root_surface(inhibitor->surface);
+      struct wlr_scene_tree *tree = surface->data;
+      if(surface && (bypass_surface_visibility || 
+               (!tree || wlr_scene_node_coords(&tree->node, &lx, &ly)) )) {
+         inhibited = 1;
+         break;
+      }
+   }
+   wlr_idle_notifier_v1_set_inhibited(server->idle_notifier, inhibited);
 }
 
 void
@@ -143,15 +163,68 @@ arrange_output(struct simple_output* output)
 {
    say(DEBUG, "arrange_output");
    struct simple_server* server = output->server;
-   struct simple_client* client;
+   struct simple_client* client, *focused_client;
 
+   get_client_from_surface(server->seat->keyboard_state.focused_surface, &focused_client, NULL);
+   
    wl_list_for_each(client, &server->clients, link) {
       if(client->output == output){
-         say(DEBUG, ">>> %u", VISIBLEON(client, output));
+         set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
          wlr_scene_node_set_enabled(&client->scene_tree->node, VISIBLEON(client, output));
       }
    }
    print_server_info(server);
+   check_idle_inhibitor(server);
+}
+
+
+//--- Other notify functions ---------------------------------------------
+static void
+new_decoration_notify(struct wl_listener *listener, void *data)
+{
+   struct wlr_xdg_toplevel_decoration_v1 *decoration = data;
+   wlr_xdg_toplevel_decoration_v1_set_mode(decoration, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+}
+
+static void
+inhibitor_destroy_notify(struct wl_listener *listener, void *data)
+{
+   //
+   say(DEBUG, "inhibitor_destroy_notify");
+   struct simple_server *server = wl_container_of(listener, server, inhibitor_destroy);
+
+   wlr_idle_notifier_v1_set_inhibited(server->idle_notifier, 0);
+}
+
+static void
+new_inhibitor_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "new_inhibitor_notify");
+   struct simple_server *server = wl_container_of(listener, server, new_inhibitor);
+   struct wlr_idle_inhibitor_v1 *inhibitor = data;
+
+   LISTEN(&inhibitor->events.destroy, &server->inhibitor_destroy, inhibitor_destroy_notify);
+   check_idle_inhibitor(server);
+}
+
+static void
+lock_session_manager_destroy_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "lock_session_manager_destroy_notify");
+   struct simple_server* server = wl_container_of(listener, server, lock_session_manager_destroy);
+
+   wl_list_remove(&server->new_lock_session_manager.link);
+   wl_list_remove(&server->lock_session_manager_destroy.link);
+}
+
+static void
+new_lock_session_manager_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "new_lock_session_manager_notify");
+   struct wlr_session_lock_v1 *session_lock = data;
+
+   //struct simple_session_lock* slock;
+   // ...
 }
 
 //--- Output notify functions --------------------------------------------
@@ -278,6 +351,8 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_output_state_init(&state);
    wlr_output_state_set_enabled(&state, true);
 
+   //wlr_output_set_scale(wlr_output, 1);
+
    struct wlr_output_mode *mode = wlr_output_preferred_mode(wlr_output);
    if (mode)
       wlr_output_state_set_mode(&state, mode);
@@ -308,13 +383,26 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_scene_node_raise_to_top(&server->layer_tree[LyrOverlay]->node);
 
    //set default tag
-   output->cur_tag = TAGMASK(0);
+   output->current_tag = TAGMASK(0);
+   output->visible_tags = TAGMASK(0);
 
    struct wlr_output_layout_output *l_output =
       wlr_output_layout_add_auto(server->output_layout, wlr_output);
    struct wlr_scene_output *scene_output =
       wlr_scene_output_create(server->scene, wlr_output);
    wlr_scene_output_layout_add_output(server->scene_output_layout, l_output, scene_output);
+
+   // update background and lock geometry
+   struct wlr_box geom;
+   wlr_output_layout_get_box(server->output_layout, NULL, &geom);
+   
+   wlr_scene_node_set_position(&server->root_bg->node, geom.x, geom.y);
+   wlr_scene_rect_set_size(server->root_bg, geom.width, geom.height);
+   wlr_scene_node_set_position(&server->locked_bg->node, geom.x, geom.y);
+   wlr_scene_rect_set_size(server->locked_bg, geom.width, geom.height);
+
+   wlr_scene_node_set_enabled(&server->root_bg->node, 1);
+   //
 
    say(INFO, " -> Output %s : %dx%d+%d+%d", l_output->output->name,
          l_output->output->width, l_output->output->height, 
@@ -343,6 +431,7 @@ kb_modifiers_notify(struct wl_listener *listener, void *data)
    struct wlr_keyboard* wlr_kb = keyboard->keyboard;
 
    if(keyboard->server->grabbed_client) {
+      // we are still cycling through the windows
       xkb_mod_index_t i;
       bool mod_pressed = false;
       for(i=0; i<xkb_keymap_num_mods(wlr_kb->keymap); i++){
@@ -350,19 +439,17 @@ kb_modifiers_notify(struct wl_listener *listener, void *data)
             mod_pressed = true;
       }
       if(!mod_pressed) {
-         say(DEBUG, ">> HHH");
          struct simple_client* client = keyboard->server->grabbed_client;
          if(server->grabbed_client_outline){
             wlr_scene_node_destroy(&server->grabbed_client_outline->tree->node);
             server->grabbed_client_outline=NULL;
          }
 
-         focus_client(client, client->type==XDG_SHELL_CLIENT ? client->xdg_surface->surface : client->xwayland_surface->surface, true);
+         focus_client(client, true);
          keyboard->server->grabbed_client=NULL;
       }
    }
 
-   //wlr_seat_set_keyboard(keyboard->server->seat, keyboard->keyboard);
    wlr_seat_keyboard_notify_modifiers(keyboard->server->seat, &keyboard->keyboard->modifiers);
 }
 
@@ -483,7 +570,7 @@ process_cursor_motion(struct simple_server *server, uint32_t time)
       wlr_cursor_set_xcursor(server->cursor, server->cursor_manager, "left_ptr");
 
    if(client && surface && client->server->config->sloppy_focus){
-      focus_client(client, surface, false);
+      focus_client(client, false);
    }
 
    if(surface) {
@@ -493,7 +580,7 @@ process_cursor_motion(struct simple_server *server, uint32_t time)
       wlr_seat_pointer_clear_focus(wlr_seat);
 }
 
-//------------------------------------------------------------------------
+//--- cursor notify functions --------------------------------------------
 static void 
 cursor_motion_notify(struct wl_listener *listener, void *data) 
 {
@@ -556,7 +643,7 @@ cursor_button_notify(struct wl_listener *listener, void *data)
       return;
    }
    
-   focus_client(client, surface, true);
+   focus_client(client, true);
 }
 
 static void 
@@ -600,6 +687,7 @@ request_set_selection_notify(struct wl_listener *listener, void *data)
    wlr_seat_set_selection(server->seat, event->source, event->serial);
 }
 
+//--- Input notify function ----------------------------------------------
 static void 
 input_destroy_notify(struct wl_listener *listener, void *data) 
 {
@@ -614,7 +702,6 @@ input_destroy_notify(struct wl_listener *listener, void *data)
    free(input);
 }
 
-//--- Input notify function ----------------------------------------------
 static void 
 new_input_notify(struct wl_listener *listener, void *data) 
 {
@@ -690,6 +777,16 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
       say(ERROR, "Unable to create wlr_backend!");
 
    // create a scene graph used to lay out windows
+   /* 
+    * | layer      | type          | example  |
+    * |------------|---------------|----------|
+    * | LyrLock    | lock-manager  | swaylock |
+    * | LyrOverlay | layer-shell   |          |
+    * | LyrTop     | layer-shell   | waybar   |
+    * | LyrClient  | normal client |          |
+    * | LyrBottom  | layer-shell   |          |
+    * | LyrBg      | layer-shell   | wbg      |
+    */
    server->scene = wlr_scene_create();
    for(int i=0; i<NLayers; i++)
       server->layer_tree[i] = wlr_scene_tree_create(&server->scene->tree);
@@ -708,15 +805,14 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
    server->compositor = wlr_compositor_create(server->display, COMPOSITOR_VERSION, server->renderer);
    wlr_subcompositor_create(server->display);
    wlr_data_device_manager_create(server->display);
-   /*
+   
    wlr_export_dmabuf_manager_v1_create(server->display);
    wlr_screencopy_manager_v1_create(server->display);
    wlr_data_control_manager_v1_create(server->display);
-   wlr_primary_selection_v1_device_manager_create(server->display);
    wlr_viewporter_create(server->display);
    wlr_single_pixel_buffer_manager_v1_create(server->display);
-   wlr_fractional_scale_manager_v1_create(server->display, 1);
-   */
+   wlr_primary_selection_v1_device_manager_create(server->display);
+   wlr_fractional_scale_manager_v1_create(server->display, FRAC_SCALE_VERSION);
    
    // create an output layout, i.e. wlroots utility for working with an arrangement of 
    // screens in a physical layout
@@ -759,7 +855,7 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
    LISTEN(&server->cursor->events.frame, &server->cursor_frame, cursor_frame_notify);
 
 
-   // set up Wayland shells, i.e. XDG, Layer, and XWayland
+   // set up Wayland shells, i.e. XDG and XWayland
    wl_list_init(&server->clients);
    wl_list_init(&server->focus_order);
    
@@ -773,9 +869,20 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
    //unmanaged surfaces
    // ...
 
-   // idle_notifier = ...
-   // idle_inhibit_manager = ...
-   // LISTEN ...
+   server->idle_notifier = wlr_idle_notifier_v1_create(server->display);
+   server->idle_inhibit_manager = wlr_idle_inhibit_v1_create(server->display);
+   LISTEN(&server->idle_inhibit_manager->events.new_inhibitor, &server->new_inhibitor, new_inhibitor_notify);
+
+   server->session_lock_manager = wlr_session_lock_manager_v1_create(server->display);
+   LISTEN(&server->session_lock_manager->events.new_lock, &server->new_lock_session_manager, new_lock_session_manager_notify);
+   LISTEN(&server->session_lock_manager->events.destroy, &server->lock_session_manager_destroy, lock_session_manager_destroy_notify);
+   // set initial size - will be updated when output is changed
+   server->locked_bg = wlr_scene_rect_create(server->layer_tree[LyrLock], 1, 1, (float [4]){0.1, 0.1, 0.1, 1.0});
+   wlr_scene_node_set_enabled(&server->locked_bg->node, 0);
+
+   // set initial background - will be updated when output is changed
+   server->root_bg = wlr_scene_rect_create(server->layer_tree[LyrBg], 1, 1, server->config->background_colour);
+   wlr_scene_node_set_enabled(&server->root_bg->node, 0);
 
    // Use decoration protocols to negotiate server-side decorations
    wlr_server_decoration_manager_set_default_mode(wlr_server_decoration_manager_create(server->display),
@@ -802,6 +909,7 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
 void 
 startServer(struct simple_server *server) 
 {
+   say(INFO, "Starting Wayland server");
 
    const char* socket = wl_display_add_socket_auto(server->display);
    if(!socket){
@@ -833,13 +941,12 @@ startServer(struct simple_server *server)
 void 
 cleanupServer(struct simple_server *server) 
 {
-   say(DEBUG, "cleanupServer");
+   say(INFO, "cleanupServer");
+
 #if XWAYLAND
    server->xwayland = NULL;
    wlr_xwayland_destroy(server->xwayland);
 #endif
-   //if(server->backend)
-   //   wlr_backend_destroy(server->backend);
 
    wl_display_destroy_clients(server->display);
    wlr_xcursor_manager_destroy(server->cursor_manager);
@@ -850,8 +957,3 @@ cleanupServer(struct simple_server *server)
    say(INFO, "Disconnected from display");
 }
 
-void
-quitServer(struct simple_server *server) 
-{
-   wl_display_terminate(server->display);
-}

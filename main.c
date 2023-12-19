@@ -1,6 +1,6 @@
 /*
  * main.c
- *   - Main SWWM Program
+ *   - Main SWC Program
  */
 
 #include <unistd.h>
@@ -8,10 +8,7 @@
 #include <sys/wait.h>
 #include <wayland-server-core.h>
 #include <wlr/backend/session.h>
-#include <wlr/types/wlr_scene.h>
-#include <wlr/util/box.h>
 #include <wlr/util/log.h>
-#include <xkbcommon/xkbcommon.h>
 #if XWAYLAND
 #include <wlr/xwayland.h>
 #endif
@@ -36,7 +33,7 @@ say(int level, const char* message, ...)
    vsnprintf(buffer, 256, message, args);
    va_end(args);
 
-   printf("SWWM [%s]: %s\n", msg_str[level], buffer);
+   printf("SWC [%s]: %s\n", msg_str[level], buffer);
    //wlr_log(WLR_INFO, " [%s]: %s", msg_str[level], buffer);
 
    if(level==ERROR) exit(EXIT_FAILURE);
@@ -79,7 +76,7 @@ signal_handler(int sig)
       while (0 < waitpid(-1, NULL, WNOHANG));
 #endif
    } else if (sig == SIGINT || sig == SIGTERM )
-      quitServer(g_server);
+      wl_display_terminate(g_server->display);
 }
 
 //--- Main function ------------------------------------------------------
@@ -114,7 +111,7 @@ main(int argc, char **argv)
       }
    }
    if(config_file[0]=='\0')
-      sprintf(config_file, "%s/%s", getenv("HOME"), ".config/swwm/configrc");
+      sprintf(config_file, "%s/%s", getenv("HOME"), ".config/swc/configrc");
 
    // Wayland requires XDG_RUNTIME_DIR for creating its communications socket
    if(!getenv("XDG_RUNTIME_DIR"))
@@ -130,6 +127,7 @@ main(int argc, char **argv)
    for(int i=0; i<LENGTH(signals); i++)
       sigaction(signals[i], &sa, NULL);
 
+   // create a server
    if(!(g_server = calloc(1, sizeof(struct simple_server))))
       say(ERROR, "Cannot allocate g_server");
 

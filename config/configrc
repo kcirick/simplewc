@@ -1,7 +1,4 @@
-# SimpleWay Config
-
-#output = X11-1:1366x768+0+0
-output = X11-1:800x600+0+0
+# SWC Config
 
 n_tags = 5
 tag_names = One;Two;Three;Four;Five
@@ -16,8 +13,15 @@ border_colour_unfocus = #333333
 border_colour_urgent = #FF0000 
 border_colour_marked = #00FF00 
 border_colour_fixed = #0000FF
+border_colour_outline = #FFFFFF
 
 #--- Key Bindings -----
 KEY = A+q QUIT 0
-KEY = S+A+Return SPAWN st
+KEY = S+A+Return SPAWN foot
+KEY = A+Tab CLIENT cycle
 
+KEY = A+1 TAG select
+KEY = A+2 TAG select
+KEY = A+3 TAG select
+KEY = A+4 TAG select
+KEY = A+5 TAG select

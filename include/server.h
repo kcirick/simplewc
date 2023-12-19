@@ -1,6 +1,8 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include <wlr/types/wlr_scene.h>
+
 struct simple_server {
    struct wl_display *display;
 
@@ -50,7 +52,7 @@ struct simple_server {
 
    struct wlr_cursor *cursor;
    struct wlr_xcursor_manager *cursor_manager;
-   enum cursor_mode cursor_mode;
+   enum CursorMode cursor_mode;
    struct wl_listener cursor_motion;
    struct wl_listener cursor_motion_abs;
    struct wl_listener cursor_button;
@@ -59,6 +61,19 @@ struct simple_server {
 
    struct wl_listener request_cursor;
    struct wl_listener request_set_selection;
+
+   struct wlr_idle_notifier_v1 *idle_notifier;
+   struct wlr_idle_inhibit_manager_v1 *idle_inhibit_manager;
+   struct wl_listener new_inhibitor;
+   struct wl_listener inhibitor_destroy;
+
+   struct wlr_session_lock_manager_v1 *session_lock_manager;
+   struct wlr_scene_rect *locked_bg;
+   struct wlr_session_lock_v1 *cur_lock;
+   struct wl_listener new_lock_session_manager;
+   struct wl_listener lock_session_manager_destroy;
+
+   struct wlr_scene_rect *root_bg;
 
    struct simple_client *grabbed_client;
    struct client_outline *grabbed_client_outline;
@@ -80,7 +95,8 @@ struct simple_output {
    struct wl_listener request_state;
    struct wl_listener destroy;
 
-   unsigned int cur_tag;
+   unsigned int current_tag;
+   unsigned int visible_tags;
 
    struct wlr_box usable_area;
 };
@@ -91,7 +107,7 @@ struct simple_input {
    struct wlr_input_device *device;
    struct wlr_keyboard *keyboard;
 
-   enum inputType type;
+   enum InputType type;
    struct wl_listener kb_modifiers;
    struct wl_listener kb_key;
    struct wl_listener destroy;
@@ -113,7 +129,7 @@ struct client_outline* client_outline_create(struct wlr_scene_tree*, float*, int
 void client_outline_set_size(struct client_outline*, int, int);
 
 void print_server_info(struct simple_server*);
-void setCurrentTag(struct simple_server*, int);
+void setCurrentTag(struct simple_server*, int, bool);
 void arrange_output(struct simple_output*);
 
 void input_focus_surface(struct simple_server*, struct wlr_surface*);
@@ -121,7 +137,5 @@ void input_focus_surface(struct simple_server*, struct wlr_surface*);
 void prepareServer(struct simple_server*, struct wlr_session*, int);
 void startServer(struct simple_server*);
 void cleanupServer(struct simple_server*);
-
-void quitServer(struct simple_server*);
 
 #endif

@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <ctype.h>
+#include <string.h>
 #include <wayland-server-core.h>
 #include <xkbcommon/xkbcommon.h>
 #include <wlr/types/wlr_keyboard.h>
