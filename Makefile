@@ -25,7 +25,7 @@ CPURPLE  = "\\033[35m"
 CRESET   = "\\033[0m"
 
 #-------------------------------------------------------------------------
-all: $(TARGET) 
+all: $(TARGET) swc-msg 
 
 include/wlr-layer-shell-unstable-v1-protocol.h:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
@@ -39,33 +39,49 @@ include/dwl-ipc-unstable-v2-protocol.h:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) server-header protocols/dwl-ipc-unstable-v2.xml $@
 
+util/dwl-ipc-unstable-v2-protocol.h:
+	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@$(WL_SCANNER) client-header protocols/dwl-ipc-unstable-v2.xml $@
+
 src/dwl-ipc-unstable-v2-protocol.c:
+	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@$(WL_SCANNER) private-code protocols/dwl-ipc-unstable-v2.xml $@
+
+util/dwl-ipc-unstable-v2-protocol.c:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) private-code protocols/dwl-ipc-unstable-v2.xml $@
 
 obj/%.o: %.c
 	@echo -e " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
-	@$(CC) $(MY_CFLAGS) -I. -Iinclude -o $@ -c $<
+	@$(CC) $(MY_CFLAGS) -Iinclude -o $@ -c $<
 
 obj/%.o: src/%.c 
 	@echo -e " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
-	@$(CC) $(MY_CFLAGS) -I. -Iinclude -o $@ -c $<
+	@$(CC) $(MY_CFLAGS) -Iinclude -o $@ -c $<
 
 $(OBJECTS): $(HEADERS)
 
 $(TARGET): $(OBJECTS) $(SOURCES) 
-	@echo -e " [ $(CPURPLE)LD$(CRESET) ] $(TARGET)"
+	@echo -e " [ $(CPURPLE)BIN$(CRESET) ] $(TARGET)"
 	@$(CC) -o $@ $(OBJECTS) $(MY_LFLAGS)
+
+swc-msg: util/swc-msg.c util/dwl-ipc-unstable-v2-protocol.h util/dwl-ipc-unstable-v2-protocol.c
+	@echo -e " [ $(CPURPLE)BIN$(CRESET) ] $@"
+	@$(CC) -o $@ $^ -Iinclude -lwayland-client
 
 clean:
 	@echo -e " [ $(CRED)RM$(CRESET) ] $(TARGET)"
 	@rm -f $(TARGET)
+	@echo -e " [ $(CRED)RM$(CRESET) ] swc-msg"
+	@rm -f swc-msg
 	@echo -e " [ $(CRED)RM$(CRESET) ] $(OBJECTS)"
 	@rm -f $(OBJECTS)
 	@echo -e " [ $(CRED)RM$(CRESET) ] wlr-layer-shell-unstable-v1-protocol.h xdg-shell-protocol.h"
 	@rm -f include/wlr-layer-shell-unstable-v1-protocol.h include/xdg-shell-protocol.h
-	@echo -e " [ $(CRED)RM$(CRESET) ] dwl-ipc-unstable-v2-protocol.c dwl-ipc-unstable-v2-protocol.h"
+	@echo -e " [ $(CRED)RM$(CRESET) ] src/dwl-ipc-unstable-v2-protocol.c include/dwl-ipc-unstable-v2-protocol.h"
 	@rm -f src/dwl-ipc-unstable-v2-protocol.c include/dwl-ipc-unstable-v2-protocol.h
+	@echo -e " [ $(CRED)RM$(CRESET) ] util/dwl-ipc-unstable-v2-protocol.c util/dwl-ipc-unstable-v2-protocol.h"
+	@rm -f util/dwl-ipc-unstable-v2-protocol.c util/dwl-ipc-unstable-v2-protocol.h
 	@echo
 
 info:

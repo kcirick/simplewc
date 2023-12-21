@@ -9,31 +9,36 @@
 #include "server.h"
 #include "ipc.h"
 
-static void dwl_ipc_manager_destroy(struct wl_resource *resource);
-static void dwl_ipc_manager_get_output(struct wl_client *client, struct wl_resource *resource, uint32_t id, struct wl_resource *output);
-static void dwl_ipc_manager_release(struct wl_client *client, struct wl_resource *resource);
-static void dwl_ipc_output_destroy(struct wl_resource *resource);
-static void dwl_ipc_output_printstatus_to(struct DwlIpcOutput*);
-static void dwl_ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *resource, uint32_t and_tags, uint32_t xor_tags);
-static void dwl_ipc_output_set_layout(struct wl_client *client, struct wl_resource *resource, uint32_t index);
-static void dwl_ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint32_t tagmask, uint32_t toggle_tagset);
-static void dwl_ipc_output_release(struct wl_client *client, struct wl_resource *resource);
+static void ipc_manager_release(struct wl_client *, struct wl_resource *);
+static void ipc_manager_get_output(struct wl_client *, struct wl_resource *, uint32_t, struct wl_resource *);
+static void ipc_output_printstatus_to(struct simple_ipc_output*);
 
+static void ipc_output_release(struct wl_client *, struct wl_resource *);
+static void ipc_output_set_client_tags(struct wl_client *, struct wl_resource *, uint32_t, uint32_t);
+static void ipc_output_set_layout(struct wl_client *, struct wl_resource *, uint32_t);
+static void ipc_output_set_tags(struct wl_client *, struct wl_resource *, uint32_t, uint32_t);
 
-static struct zdwl_ipc_manager_v2_interface dwl_manager_implementation = {
-   .release = dwl_ipc_manager_release,
-   .get_output = dwl_ipc_manager_get_output
+static struct zdwl_ipc_manager_v2_interface ipc_manager_implementation = {
+   .release = ipc_manager_release,
+   .get_output = ipc_manager_get_output
 };
 
-static struct zdwl_ipc_output_v2_interface dwl_output_implementation = {
-   .release = dwl_ipc_output_release,
-   .set_tags = dwl_ipc_output_set_tags,
-   .set_layout = dwl_ipc_output_set_layout,
-   .set_client_tags = dwl_ipc_output_set_client_tags
+static struct zdwl_ipc_output_v2_interface ipc_output_implementation = {
+   .release = ipc_output_release,
+   .set_tags = ipc_output_set_tags,
+   .set_layout = ipc_output_set_layout,
+   .set_client_tags = ipc_output_set_client_tags
 };
+
+//--- Public functions ---------------------------------------------------
+static void
+ipc_manager_destroy(struct wl_resource *resource)
+{
+	/* No state to destroy */
+}
 
 void
-dwl_ipc_manager_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
+ipc_manager_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 {
 	struct wl_resource *manager_resource = wl_resource_create(client, &zdwl_ipc_manager_v2_interface, version, id);
 	if (!manager_resource) {
@@ -41,26 +46,45 @@ dwl_ipc_manager_bind(struct wl_client *client, void *data, uint32_t version, uin
 		return;
 	}
 
-	wl_resource_set_implementation(manager_resource, &dwl_manager_implementation, NULL, dwl_ipc_manager_destroy);
+	wl_resource_set_implementation(manager_resource, &ipc_manager_implementation, NULL, ipc_manager_destroy);
 
-	zdwl_ipc_manager_v2_send_tags(manager_resource, MAX_TAGS);
+	//zdwl_ipc_manager_v2_send_tags(manager_resource, MAX_TAGS);
+	zdwl_ipc_manager_v2_send_tags(manager_resource, g_server->config->n_tags);
 
 	//for (int i = 0; i < LENGTH(layouts); i++)
 	//	zdwl_ipc_manager_v2_send_layout(manager_resource, layouts[i].symbol);
 }
 
 void
-dwl_ipc_manager_destroy(struct wl_resource *resource)
+ipc_output_printstatus(struct simple_output *output)
 {
-	/* No state to destroy */
+	struct simple_ipc_output *ipc_output;
+	wl_list_for_each(ipc_output, &output->ipc_outputs, link)
+		ipc_output_printstatus_to(ipc_output);
+}
+
+//--- IPC manager implementation -----------------------------------------
+static void
+ipc_output_destroy(struct wl_resource *resource)
+{
+	struct simple_ipc_output *ipc_output = wl_resource_get_user_data(resource);
+	wl_list_remove(&ipc_output->link);
+	free(ipc_output);
 }
 
 void
-dwl_ipc_manager_get_output(struct wl_client *client, struct wl_resource *resource, uint32_t id, struct wl_resource *output)
+ipc_manager_release(struct wl_client *client, struct wl_resource *resource)
 {
-	struct DwlIpcOutput *ipc_output;
+	wl_resource_destroy(resource);
+}
+
+void
+ipc_manager_get_output(struct wl_client *client, struct wl_resource *resource, uint32_t id, struct wl_resource *output)
+{
+	struct simple_ipc_output *ipc_output;
 	struct simple_output *sop = wlr_output_from_resource(output)->data;
    //struct simple_server *server = sop->server;
+
 	struct wl_resource *output_resource = wl_resource_create(client, &zdwl_ipc_output_v2_interface, wl_resource_get_version(resource), id);
 	if (!output_resource)
 		return;
@@ -68,42 +92,20 @@ dwl_ipc_manager_get_output(struct wl_client *client, struct wl_resource *resourc
 	ipc_output = calloc(1, sizeof(*ipc_output));
 	ipc_output->resource = output_resource;
  	ipc_output->output = sop;
-	wl_resource_set_implementation(output_resource, &dwl_output_implementation, ipc_output, dwl_ipc_output_destroy);
+	wl_resource_set_implementation(output_resource, &ipc_output_implementation, ipc_output, ipc_output_destroy);
 	
-   wl_list_insert(&sop->dwl_ipc_outputs, &ipc_output->link);
-	dwl_ipc_output_printstatus_to(ipc_output);
+   wl_list_insert(&sop->ipc_outputs, &ipc_output->link);
+	ipc_output_printstatus_to(ipc_output);
 }
 
 void
-dwl_ipc_manager_release(struct wl_client *client, struct wl_resource *resource)
-{
-	wl_resource_destroy(resource);
-}
-
-static void
-dwl_ipc_output_destroy(struct wl_resource *resource)
-{
-	struct DwlIpcOutput *ipc_output = wl_resource_get_user_data(resource);
-	wl_list_remove(&ipc_output->link);
-	free(ipc_output);
-}
-
-void
-dwl_ipc_output_printstatus(struct simple_output *output)
-{
-	struct DwlIpcOutput *ipc_output;
-	wl_list_for_each(ipc_output, &output->dwl_ipc_outputs, link)
-		dwl_ipc_output_printstatus_to(ipc_output);
-}
-
-void
-dwl_ipc_output_printstatus_to(struct DwlIpcOutput *ipc_output)
+ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
 {
 	struct simple_output *output = ipc_output->output;
    struct simple_server *server = output->server;
 	struct simple_client *c, *focused;
 	int tagmask, state, numclients, focused_client, tag;
-   //const char *title, *appid;
+   char *title, *appid;
 	
    focused = get_top_client_from_output(output);
 	zdwl_ipc_output_v2_send_active(ipc_output->resource, output == server->cur_output);
@@ -129,13 +131,13 @@ dwl_ipc_output_printstatus_to(struct DwlIpcOutput *ipc_output)
 		}
 		zdwl_ipc_output_v2_send_tag(ipc_output->resource, tag, state, numclients, focused_client);
 	}
-	//title = focused ? client_get_title(focused) : "";
-	//appid = focused ? client_get_appid(focused) : "";
+	title = focused ? get_client_title(focused) : "";
+	appid = focused ? get_client_appid(focused) : "";
    ////////////////////////////////////////////////
 
 	//zdwl_ipc_output_v2_send_layout(ipc_output->resource, monitor->lt[monitor->sellt] - layouts);
-	//zdwl_ipc_output_v2_send_title(ipc_output->resource, title ? title : broken);
-	//zdwl_ipc_output_v2_send_appid(ipc_output->resource, appid ? appid : broken);
+	zdwl_ipc_output_v2_send_title(ipc_output->resource, title ? title : "broken");
+	zdwl_ipc_output_v2_send_appid(ipc_output->resource, appid ? appid : "broken");
 	//zdwl_ipc_output_v2_send_layout_symbol(ipc_output->resource, monitor->ltsymbol);
 	//if (wl_resource_get_version(ipc_output->resource) >= ZDWL_IPC_OUTPUT_V2_FULLSCREEN_SINCE_VERSION) {
 	//	zdwl_ipc_output_v2_send_fullscreen(ipc_output->resource, focused ? focused->isfullscreen : 0);
@@ -146,27 +148,31 @@ dwl_ipc_output_printstatus_to(struct DwlIpcOutput *ipc_output)
 	zdwl_ipc_output_v2_send_frame(ipc_output->resource);
 }
 
+//--- IPC output implementation ------------------------------------------
 void
-dwl_ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *resource, uint32_t and_tags, uint32_t xor_tags)
+ipc_output_release(struct wl_client *client, struct wl_resource *resource)
 {
-	struct DwlIpcOutput *ipc_output;
+	wl_resource_destroy(resource);
+}
+
+void
+ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *resource, uint32_t and_tags, uint32_t xor_tags)
+{
+	struct simple_ipc_output *ipc_output;
 	struct simple_output *output;
 	struct simple_client *selected_client;
-	unsigned int newtags = 0;
+	uint32_t newtags = 0;
 
 	ipc_output = wl_resource_get_user_data(resource);
-	if (!ipc_output)
-		return;
+	if (!ipc_output) return;
 
 	output = ipc_output->output;
    struct simple_server* server = output->server;
 	selected_client = get_top_client_from_output(output);
-	if (!selected_client)
-		return;
+	if (!selected_client) return;
 
 	newtags = (selected_client->tag & and_tags) ^ xor_tags;
-	if (!newtags)
-		return;
+	if (!newtags) return;
 
 	selected_client->tag = newtags;
 	//focusclient(get_top_client_from_output(server->cur_output), 1);
@@ -175,7 +181,7 @@ dwl_ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *res
 }
 
 void
-dwl_ipc_output_set_layout(struct wl_client *client, struct wl_resource *resource, uint32_t index)
+ipc_output_set_layout(struct wl_client *client, struct wl_resource *resource, uint32_t index)
 {
    /*
 	struct DwlIpcOutput *ipc_output;
@@ -198,16 +204,16 @@ dwl_ipc_output_set_layout(struct wl_client *client, struct wl_resource *resource
 }
 
 void
-dwl_ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint32_t tagmask, uint32_t toggle_tagset)
+ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint32_t tagmask, uint32_t toggle_tagset)
 {
-	struct DwlIpcOutput *ipc_output;
+	struct simple_ipc_output *ipc_output;
 	struct simple_output *output;
 	//unsigned int newtags = tagmask & TAGMASK;
 	unsigned int newtags = tagmask;
 
 	ipc_output = wl_resource_get_user_data(resource);
-	if (!ipc_output)
-		return;
+	if (!ipc_output) return;
+
 	output = ipc_output->output;
    struct simple_server *server = output->server;
 
@@ -223,11 +229,5 @@ dwl_ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, 
 	//focusclient(focustop(monitor), 1);
 	arrange_output(output);
 	print_server_info(server);
-}
-
-void
-dwl_ipc_output_release(struct wl_client *client, struct wl_resource *resource)
-{
-	wl_resource_destroy(resource);
 }
 

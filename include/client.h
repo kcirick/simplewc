@@ -46,6 +46,8 @@ void sendClientToTag(struct simple_client*, int);
 void toggleClientFixed(struct simple_client*);
 void cycleClients(struct simple_output*);
 
+char * get_client_title(struct simple_client*);
+char * get_client_appid(struct simple_client*);
 struct simple_client* get_top_client_from_output(struct simple_output*);
 struct simple_client* get_client_at(struct simple_server*, double, double, struct wlr_surface**, double*, double*);
 int get_client_from_surface(struct wlr_surface*, struct simple_client**, struct simple_layer_surface**);

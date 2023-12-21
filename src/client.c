@@ -155,6 +155,27 @@ begin_interactive(struct simple_client *client, enum CursorMode mode, uint32_t e
    }  
 }
 
+//------------------------------------------------------------------------
+char *
+get_client_title(struct simple_client* client)
+{
+#ifdef XWAYLAND
+   if(client->type==XWL_MANAGED_CLIENT || client->type==XWL_UNMANAGED_CLIENT)
+      return client->xwl_surface->title;
+#endif
+   return client->xdg_surface->toplevel->title;
+}
+
+char *
+get_client_appid(struct simple_client* client)
+{
+#ifdef XWAYLAND
+   if(client->type==XWL_MANAGED_CLIENT || client->type==XWL_UNMANAGED_CLIENT)
+      return client->xwl_surface->class;
+#endif
+   return client->xdg_surface->toplevel->app_id;
+}
+
 struct simple_client*
 get_top_client_from_output(struct simple_output* output)
 {

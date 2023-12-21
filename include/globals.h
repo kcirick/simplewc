@@ -12,6 +12,7 @@
 #define LAYER_SHELL_VERSION (4)
 #define COMPOSITOR_VERSION (5)
 #define FRAC_SCALE_VERSION (1)
+#define DWL_IPC_VERSION (2)
 
 #define N_LAYER_SHELL_LAYERS 4
 
@@ -70,6 +71,9 @@ struct autostart {
    struct wl_list link;
    char command[32];
 };
+
+//--- global variables -----
+extern struct simple_server* g_server;
 
 //--- functions in config.c -----
 struct simple_config * readConfiguration(char*);

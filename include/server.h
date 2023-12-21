@@ -89,7 +89,7 @@ struct simple_output {
 
    struct wl_list layer_shells[N_LAYER_SHELL_LAYERS];
 
-   struct wl_list dwl_ipc_outputs; // ipc addition
+   struct wl_list ipc_outputs; // ipc addition
 
    struct wl_listener frame;
    struct wl_listener request_state;

@@ -136,7 +136,7 @@ print_server_info(struct simple_server* server)
    }
 
    wl_list_for_each(output, &server->outputs, link)
-      dwl_ipc_output_printstatus(output);
+      ipc_output_printstatus(output);
 }
 
 void
@@ -315,8 +315,8 @@ output_destroy_notify(struct wl_listener *listener, void *data)
    say(DEBUG, "output_destroy_notify");
    struct simple_output *output = wl_container_of(listener, output, destroy);
 
-   struct DwlIpcOutput *ipc_output, *ipc_output_tmp;
-   wl_list_for_each_safe(ipc_output, ipc_output_tmp, &output->dwl_ipc_outputs, link)
+   struct simple_ipc_output *ipc_output, *ipc_output_tmp;
+   wl_list_for_each_safe(ipc_output, ipc_output_tmp, &output->ipc_outputs, link)
       wl_resource_destroy(ipc_output->resource);
 
    wl_list_remove(&output->frame.link);
@@ -365,7 +365,7 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_output->data = output;
    output->server = server;
 
-   wl_list_init(&output->dwl_ipc_outputs);   // ipc addition
+   wl_list_init(&output->ipc_outputs);   // ipc addition
 
    LISTEN(&wlr_output->events.frame, &output->frame, output_frame_notify);
    LISTEN(&wlr_output->events.destroy, &output->destroy, output_destroy_notify);
@@ -893,7 +893,7 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
    struct wlr_presentation *presentation = wlr_presentation_create(server->display, server->backend);
    wlr_scene_set_presentation(server->scene, presentation);
 
-   wl_global_create(server->display, &zdwl_ipc_manager_v2_interface, 2, NULL, dwl_ipc_manager_bind);
+   wl_global_create(server->display, &zdwl_ipc_manager_v2_interface, DWL_IPC_VERSION, NULL, ipc_manager_bind);
 
 #if XWAYLAND
    if(!(server->xwayland = wlr_xwayland_create(server->display, server->compositor, true))) {

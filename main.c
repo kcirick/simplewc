@@ -17,9 +17,10 @@
 #include "server.h"
 
 static const char *msg_str[NMSG] = { "DEBUG", "INFO", "WARNING", "ERROR" };
-static struct wlr_session *g_session;
-static struct simple_server* g_server;
 static int info_level = WLR_SILENT;
+static struct wlr_session *g_session;
+
+struct simple_server* g_server;
 
 //------------------------------------------------------------------------
 void 
