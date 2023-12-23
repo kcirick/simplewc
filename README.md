@@ -21,8 +21,11 @@ to teach myself the basics of window management. (formerly SimpleWay).
 [dwlmsg]: https://codeberg.org/notchoc/dwlmsg
 
 Usage:
+
 `> swc [--config file][--start cmd][--debug][--version][--help]`
+
 `> swc-msg --set [--tag .+-^][--client tag_n]`
+
 `> swc-msg (--get | --watch) [--output][--tag][--client (title | appid)]`
 
 
@@ -35,7 +38,9 @@ Still a work in progress, and not in a working state yet. Stay tuned...
 
 
 ## Version Log
-No versions tagged yet ...
 
-  - 0.1 (Work in progress)
+  - 0.2 (Work in progress)
+  - 0.1 (2023-12-23) ([download][v01])
     - Goal: get the base code in working order
+
+[v01]: https://github.com/kcirick/swc/archive/refs/tags/v0.1.tar.gz
