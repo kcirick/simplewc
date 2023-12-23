@@ -12,16 +12,26 @@ to teach myself the basics of window management. (formerly SimpleWay).
  - Features:
    - No frills (menu, titlebar, icons, pixmap themes, etc...)
    - Text config file (default $HOME/.config/swwm/configrc)
+   - Simple tiling (manual left-right tiling or auto-tile like DWL/DWM)
+   - swc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])
 
 [tinywl]: https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl
 [dwl]: https://codeberg.org/dwl/dwl
 [labwc]: https://github.com/labwc/labwc
+[dwlmsg]: https://codeberg.org/notchoc/dwlmsg
 
 Usage:
-`> swwm [--config file][--start cmd][--debug][--version][--help]`
+`> swc [--config file][--start cmd][--debug][--version][--help]`
+`> swc-msg --set [--tag .+-^][--client tag_n]`
+`> swc-msg (--get | --watch) [--output][--tag][--client (title | appid)]`
+
 
 ## Status
+Please use [Github Issues Tracker][ghit] to report bugs and issues.
+
 Still a work in progress, and not in a working state yet. Stay tuned...
+
+[ghit]: https://github.com/kcirick/swc/issues
 
 
 ## Version Log

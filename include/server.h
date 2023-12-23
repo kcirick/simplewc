@@ -61,6 +61,7 @@ struct simple_server {
 
    struct wl_listener request_cursor;
    struct wl_listener request_set_selection;
+   struct wl_listener request_set_primary_selection;
 
    struct wlr_idle_notifier_v1 *idle_notifier;
    struct wlr_idle_inhibit_manager_v1 *idle_inhibit_manager;
@@ -130,6 +131,7 @@ void client_outline_set_size(struct client_outline*, int, int);
 
 void print_server_info(struct simple_server*);
 void setCurrentTag(struct simple_server*, int, bool);
+void tileTag(struct simple_server*);
 void arrange_output(struct simple_output*);
 
 void input_focus_surface(struct simple_server*, struct wlr_surface*);

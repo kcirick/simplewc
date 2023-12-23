@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <signal.h>
 #include <linux/input-event-codes.h>
-#include <wayland-server-core.h>
 #include <wlr/backend.h>
 #include <wlr/backend/session.h>
 #include <wlr/render/allocator.h>
@@ -27,12 +26,6 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/util/edges.h>
-#include <wlr/util/log.h>
-#include <xkbcommon/xkbcommon.h>
-#if XWAYLAND
-#include <wlr/xwayland.h>
-#endif
-
 //
 #include <wlr/types/wlr_export_dmabuf_v1.h>
 #include <wlr/types/wlr_screencopy_v1.h>
@@ -43,6 +36,10 @@
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 //
+#include <wlr/util/log.h>
+#if XWAYLAND
+#include <wlr/xwayland.h>
+#endif
 
 #include "dwl-ipc-unstable-v2-protocol.h"
 #include "globals.h"
@@ -111,6 +108,48 @@ setCurrentTag(struct simple_server* server, int tag, bool toggle)
    arrange_output(output);
 }
 
+void
+tileTag(struct simple_server* server) 
+{
+   struct simple_client* client;
+   struct simple_output* output = server->cur_output;
+   
+   // first count the number of clients
+   int n=0;
+   wl_list_for_each(client, &server->clients, link){
+      if(!VISIBLEON(client, output)) continue;
+      n++;
+   }
+
+   int gap_width = server->config->tile_gap_width;
+   int bw = server->config->border_width;
+
+   int i=0;
+   struct wlr_box new_geom;
+   wl_list_for_each(client, &server->clients, link){
+      if(!VISIBLEON(client, output)) continue;
+      
+      if(i==0) { // master window
+         new_geom.x = output->usable_area.x + gap_width + bw;
+         new_geom.y = output->usable_area.y + gap_width + bw;
+         new_geom.width = (output->usable_area.width - (gap_width*(MIN(2,n)+1)))/MIN(2,n) - bw*2;
+         new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
+         
+         set_client_geometry(client, new_geom);
+      } else {
+         new_geom.x = output->usable_area.width/2 + gap_width/2 + bw;
+         new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
+         new_geom.height = (output->usable_area.height - (gap_width*n))/(n-1);
+         new_geom.y = output->usable_area.y + (gap_width*i) + (new_geom.height*(i-1)) + bw;
+         new_geom.height -= 2*bw;
+         
+         set_client_geometry(client, new_geom);
+      }
+      i++;
+   }
+   arrange_output(output);
+}
+
 struct simple_output*
 get_output_at(struct simple_server* server, double x, double y)
 {
@@ -125,13 +164,13 @@ print_server_info(struct simple_server* server)
    struct simple_client* client;
 
    wl_list_for_each(output, &server->outputs, link) {
-      say(INFO, "output %s", output->wlr_output->name);
-      say(INFO, " -> cur_output = %u", output == server->cur_output);
-      say(INFO, " -> tag = vis:%u / cur:%u", output->visible_tags, output->current_tag);
+      say(DEBUG, "output %s", output->wlr_output->name);
+      say(DEBUG, " -> cur_output = %u", output == server->cur_output);
+      say(DEBUG, " -> tag = vis:%u / cur:%u", output->visible_tags, output->current_tag);
       wl_list_for_each(client, &server->clients, link) {
-         say(INFO, " -> client");
-         say(INFO, "    -> client tag = %u", client->tag);
-         say(INFO, "    -> client fixed = %b", client->fixed);
+         say(DEBUG, " -> client");
+         say(DEBUG, "    -> client tag = %u", client->tag);
+         say(DEBUG, "    -> client fixed = %b", client->fixed);
       }
    }
 
@@ -221,7 +260,7 @@ static void
 new_lock_session_manager_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "new_lock_session_manager_notify");
-   struct wlr_session_lock_v1 *session_lock = data;
+   //struct wlr_session_lock_v1 *session_lock = data;
 
    //struct simple_session_lock* slock;
    // ...
@@ -255,9 +294,6 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
 
       memset(&output->usable_area, 0, sizeof(output->usable_area));
       output->usable_area = box;
-      say(INFO, " box x=%d / y=%d / w=%d / h=%d", box.x, box.y, box.width, box.height);
-
-      //arrange_layers(output);
 
       config_head->state.x = box.x;
       config_head->state.y = box.y;
@@ -350,8 +386,6 @@ new_output_notify(struct wl_listener *listener, void *data)
    struct wlr_output_state state;
    wlr_output_state_init(&state);
    wlr_output_state_set_enabled(&state, true);
-
-   //wlr_output_set_scale(wlr_output, 1);
 
    struct wlr_output_mode *mode = wlr_output_preferred_mode(wlr_output);
    if (mode)
@@ -627,7 +661,7 @@ cursor_button_notify(struct wl_listener *listener, void *data)
    
    // press on desktop
    if(!client) {
-      say(INFO, "press on desktop");
+      say(DEBUG, "press on desktop");
       return;
    }
    
@@ -685,6 +719,14 @@ request_set_selection_notify(struct wl_listener *listener, void *data)
    struct simple_server *server = wl_container_of(listener, server, request_set_selection);
    struct wlr_seat_request_set_selection_event *event = data;
    wlr_seat_set_selection(server->seat, event->source, event->serial);
+}
+
+static void
+request_set_primary_selection_notify(struct wl_listener *listener, void *data)
+{
+   struct simple_server *server = wl_container_of(listener, server, request_set_primary_selection);
+   struct wlr_seat_request_set_primary_selection_event *event = data;
+   wlr_seat_set_primary_selection(server->seat, event->source, event->serial);
 }
 
 //--- Input notify function ----------------------------------------------
@@ -766,7 +808,7 @@ new_input_notify(struct wl_listener *listener, void *data)
 void 
 prepareServer(struct simple_server *server, struct wlr_session *session, int info_level) 
 {
-   say(INFO, "Preparing Wayland server initialization");
+   say(INFO, "Preparing Wayland server");
    
    wlr_log_init(info_level, NULL);
 
@@ -839,6 +881,9 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
 
    LISTEN(&server->seat->events.request_set_cursor, &server->request_cursor, request_cursor_notify);
    LISTEN(&server->seat->events.request_set_selection, &server->request_set_selection, request_set_selection_notify);
+   LISTEN(&server->seat->events.request_set_primary_selection, &server->request_set_primary_selection, request_set_primary_selection_notify);
+   //LISTEN(&server->seat->events.request_set_drag, &server->request_set_drag, request_set_drag_notify);
+   //LISTEN(&server->seat->events.start_drag, &server->start_drag, start_drag_notify);
 
    server->cursor = wlr_cursor_create();
    wlr_cursor_attach_output_layout(server->cursor, server->output_layout); 
@@ -897,7 +942,7 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
 
 #if XWAYLAND
    if(!(server->xwayland = wlr_xwayland_create(server->display, server->compositor, true))) {
-      say(INFO, "unable to create xwayland server. Continuing without it");
+      say(WARNING, "unable to create xwayland server. Continuing without it");
       return;
    }
 
@@ -923,7 +968,7 @@ startServer(struct simple_server *server)
    }
    
    setenv("WAYLAND_DISPLAY", socket, true);
-   say(INFO, "Wayland server is running on WAYLAND_DISPLAY=%s ...", socket);
+   say(INFO, " -> Wayland server is running on WAYLAND_DISPLAY=%s ...", socket);
 
 #if XWAYLAND
    if(setenv("DISPLAY", server->xwayland->display_name, true) < 0)
@@ -941,7 +986,7 @@ startServer(struct simple_server *server)
 void 
 cleanupServer(struct simple_server *server) 
 {
-   say(INFO, "cleanupServer");
+   say(INFO, "Cleaning up Wayland server");
 
 #if XWAYLAND
    server->xwayland = NULL;
@@ -954,6 +999,5 @@ cleanupServer(struct simple_server *server)
    wl_display_destroy(server->display);
    // Destroy after the wayland display
    wlr_scene_node_destroy(&server->scene->tree.node);
-   say(INFO, "Disconnected from display");
 }
 

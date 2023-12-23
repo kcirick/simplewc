@@ -39,29 +39,28 @@ include/dwl-ipc-unstable-v2-protocol.h:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) server-header protocols/dwl-ipc-unstable-v2.xml $@
 
-util/dwl-ipc-unstable-v2-protocol.h:
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
-	@$(WL_SCANNER) client-header protocols/dwl-ipc-unstable-v2.xml $@
-
 src/dwl-ipc-unstable-v2-protocol.c:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) private-code protocols/dwl-ipc-unstable-v2.xml $@
+
+util/dwl-ipc-unstable-v2-protocol.h:
+	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@$(WL_SCANNER) client-header protocols/dwl-ipc-unstable-v2.xml $@
 
 util/dwl-ipc-unstable-v2-protocol.c:
 	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) private-code protocols/dwl-ipc-unstable-v2.xml $@
 
-obj/%.o: %.c
+#-----
+obj/%.o: %.c $(HEADERS)
 	@echo -e " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
 	@$(CC) $(MY_CFLAGS) -Iinclude -o $@ -c $<
 
-obj/%.o: src/%.c 
+obj/%.o: src/%.c $(HEADERS)
 	@echo -e " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
 	@$(CC) $(MY_CFLAGS) -Iinclude -o $@ -c $<
 
-$(OBJECTS): $(HEADERS)
-
-$(TARGET): $(OBJECTS) $(SOURCES) 
+$(TARGET): $(OBJECTS) 
 	@echo -e " [ $(CPURPLE)BIN$(CRESET) ] $(TARGET)"
 	@$(CC) -o $@ $(OBJECTS) $(MY_LFLAGS)
 

@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
-#include <wayland-server-core.h>
 #include <wlr/backend/session.h>
 #include <wlr/util/log.h>
 #if XWAYLAND
@@ -46,7 +45,7 @@ spawn(char* cmd)
    char *sh = NULL;
    if(!(sh=getenv("SHELL"))) sh = (char*)"/bin/sh";
 
-   say(INFO, "Spawn %s", cmd);
+   say(DEBUG, "Spawn %s", cmd);
    pid_t pid = fork();
    if(pid==0){
       pid_t child;
@@ -99,15 +98,12 @@ main(int argc, char **argv)
       else if(!strcmp(iarg, "--debug")) {
          info_level = WLR_DEBUG;
       }
-      else if(!strcmp(iarg, "--info")) {
-         info_level = WLR_INFO;
-      }
       else if(!strcmp(iarg, "--version")) {
          say(INFO, "Version-"VERSION);
          exit(EXIT_SUCCESS);
       }
       else if(!strcmp(iarg, "--help")) {
-         say(INFO, "Usage: swwm [--config file][--debug][--info][--version][--help]");
+         say(INFO, "Usage: swwm [--config file][--debug][--version][--help]");
          exit(EXIT_SUCCESS);
       }
    }

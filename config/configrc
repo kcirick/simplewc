@@ -19,6 +19,7 @@ border_colour_outline = #FFFFFF
 KEY = A+q QUIT 0
 KEY = S+A+Return SPAWN foot
 KEY = A+Tab CLIENT cycle
+KEY = A+k CLINET kill
 
 KEY = A+1 TAG select
 KEY = A+2 TAG select

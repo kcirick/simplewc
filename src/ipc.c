@@ -1,6 +1,5 @@
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_cursor.h>
-#include <xkbcommon/xkbcommon.h>
 
 #include "dwl-ipc-unstable-v2-protocol.h"
 #include "globals.h"

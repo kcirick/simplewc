@@ -45,6 +45,8 @@ void toggleClientTag(struct simple_client*, int);
 void sendClientToTag(struct simple_client*, int);
 void toggleClientFixed(struct simple_client*);
 void cycleClients(struct simple_output*);
+void killClient(struct simple_client*);
+void tileClient(struct simple_client*, enum Direction);
 
 char * get_client_title(struct simple_client*);
 char * get_client_appid(struct simple_client*);

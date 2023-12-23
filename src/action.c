@@ -1,10 +1,8 @@
 #include <string.h>
-#include <wayland-server-core.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/util/box.h>
-#include <xkbcommon/xkbcommon.h>
 
 #include "globals.h"
 #include "layer.h"
@@ -26,6 +24,7 @@ key_function(struct simple_server *server, struct keymap *keymap)
       if(!strcmp(keymap->argument, "next"))     setCurrentTag(server, /*curtag*/+1, false);
       if(!strcmp(keymap->argument, "select"))   setCurrentTag(server, keymap->keysym-XKB_KEY_1, false);
       if(!strcmp(keymap->argument, "toggle"))   setCurrentTag(server, keymap->keysym-XKB_KEY_1, true);
+      if(!strcmp(keymap->argument, "tile"))     tileTag(server);
    }
 
    //--- CLIENT -----
@@ -36,6 +35,9 @@ key_function(struct simple_server *server, struct keymap *keymap)
       if(!strcmp(keymap->argument, "send_to_tag"))    sendClientToTag(client, keymap->keysym-XKB_KEY_1);
       if(!strcmp(keymap->argument, "cycle"))          cycleClients(client->output);
       if(!strcmp(keymap->argument, "toggle_fixed"))   toggleClientFixed(client);
+      if(!strcmp(keymap->argument, "kill"))           killClient(client);
+      if(!strcmp(keymap->argument, "tile_left"))      tileClient(client, LEFT);
+      if(!strcmp(keymap->argument, "tile_right"))     tileClient(client, RIGHT);
       if(!strcmp(keymap->argument, "move")){
          if(keymap->keysym==XKB_KEY_Left)    client->geom.x-=server->config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Right)   client->geom.x+=server->config->moveresize_step;

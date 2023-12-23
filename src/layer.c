@@ -1,4 +1,3 @@
-#include <wayland-server-core.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_output.h>
@@ -6,7 +5,6 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_xdg_shell.h>
-#include <xkbcommon/xkbcommon.h>
 
 #include "globals.h"
 #include "layer.h"
@@ -38,7 +36,7 @@ arrange_layer(struct wl_list *list, const struct wlr_box *full_area, struct wlr_
 void
 arrange_layers(struct simple_output *output)
 {
-   say(INFO, "arrange_layers");
+   say(DEBUG, "arrange_layers");
 
    struct wlr_box full_area = { 0 };
    wlr_output_effective_resolution(output->wlr_output, &full_area.width, &full_area.height);
@@ -59,7 +57,7 @@ arrange_layers(struct simple_output *output)
    }
 
    output -> usable_area = usable_area;
-   say(INFO, "Useable area = %dx%d+%d+%d / Full area = %dx%d+%d+%d", 
+   say(DEBUG, "Useable area = %dx%d+%d+%d / Full area = %dx%d+%d+%d", 
          usable_area.width, usable_area.height, usable_area.x, usable_area.y,
          full_area.width, full_area.height, full_area.x, full_area.y);
 
@@ -84,14 +82,14 @@ static void
 layer_surface_map_notify(struct wl_listener *listener, void *data) 
 {
    //
-   say(INFO, "layer_surface_map_notify");
+   say(DEBUG, "layer_surface_map_notify");
 }
 
 static void 
 layer_surface_unmap_notify(struct wl_listener *listener, void *data) 
 {
    //
-   say(INFO, "layer_surface_unmap_notify");
+   say(DEBUG, "layer_surface_unmap_notify");
 
    struct simple_layer_surface *lsurface = wl_container_of(listener, lsurface, unmap);
    struct wlr_layer_surface_v1 *wlr_lsurface = lsurface->scene_layer_surface->layer_surface;
@@ -109,7 +107,7 @@ layer_surface_unmap_notify(struct wl_listener *listener, void *data)
 static void 
 layer_surface_commit_notify(struct wl_listener *listener, void *data) 
 {
-   //say(INFO, "layer_surface_commit_notify");
+   //say(DEBUG, "layer_surface_commit_notify");
 
    struct simple_layer_surface *lsurface = wl_container_of(listener, lsurface, surface_commit);
    struct wlr_layer_surface_v1 *wlr_lsurface = lsurface->scene_layer_surface->layer_surface;
@@ -141,7 +139,7 @@ static void
 layer_surface_destroy_notify(struct wl_listener *listener, void *data) 
 {
    //
-   say(INFO, "layer_surface_destroy_notify");
+   say(DEBUG, "layer_surface_destroy_notify");
    struct simple_layer_surface *lsurface = wl_container_of(listener, lsurface, destroy);
 
    wl_list_remove(&lsurface->link);
@@ -157,7 +155,7 @@ layer_surface_destroy_notify(struct wl_listener *listener, void *data)
 void 
 layer_new_surface_notify(struct wl_listener *listener, void *data) 
 {
-   say(INFO, "layer_new_surface_notify");
+   say(DEBUG, "layer_new_surface_notify");
    struct simple_server *server = wl_container_of(listener, server, layer_new_surface);
    struct wlr_layer_surface_v1 *layer_surface = data;
 

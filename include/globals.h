@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <wayland-server-core.h>
 #include <xkbcommon/xkbcommon.h>
 
 #define MAX_TAGS 9
@@ -21,6 +22,8 @@
 #define LENGTH(X)          (sizeof X / sizeof X[0])
 #define TAGMASK(T)         (1 << (T))
 #define VISIBLEON(C, O)    ((O) && (C)->output==(O) && ((C)->fixed || ((C)->tag & (O)->visible_tags)))
+#define MIN(A, B)          ((A)<(B) ? (A) : (B))
+#define MAX(A, B)          ((A)>(B) ? (A) : (B))
 
 //--- enums -----
 enum BorderColours   { FOCUSED, UNFOCUSED, URGENT, MARKED, FIXED, OUTLINE, NBORDERCOL };
@@ -30,14 +33,16 @@ enum CursorMode      { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE };
 
 enum MessageType        { DEBUG, INFO, WARNING, ERROR, NMSG };
 enum ClientType         { XDG_SHELL_CLIENT, LAYER_SHELL_CLIENT, XWL_MANAGED_CLIENT, XWL_UNMANAGED_CLIENT };
-enum InputType          {INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
-enum LayerType          {LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, LyrLock, NLayers }; // scene layers
-enum NodeDescriptorType {NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP};
+enum InputType          { INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
+enum LayerType          { LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, LyrLock, NLayers }; // scene layers
+enum NodeDescriptorType { NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP };
+enum Direction          { LEFT, RIGHT, UP, DOWN };
 
 struct simple_config {
    int n_tags;
    char tag_names[MAX_TAGS][32];
    int border_width;
+   int tile_gap_width;
    bool sloppy_focus;
    int moveresize_step;
 
@@ -69,7 +74,7 @@ struct mousemap {
 
 struct autostart {
    struct wl_list link;
-   char command[32];
+   char command[64];
 };
 
 //--- global variables -----
@@ -83,4 +88,3 @@ void say(int, const char*, ...);
 void spawn(char*);
 
 #endif
-

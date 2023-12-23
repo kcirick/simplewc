@@ -1,8 +1,6 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
-#include <wayland-server-core.h>
-#include <xkbcommon/xkbcommon.h>
 #include <wlr/types/wlr_keyboard.h>
 
 #include "globals.h"
@@ -108,6 +106,7 @@ struct simple_config * readConfiguration(char* filename) {
       }
 
       if(!strcmp(id, "border_width")) config->border_width = atoi(value);
+      if(!strcmp(id, "tile_gap_width")) config->tile_gap_width = atoi(value);
       if(!strcmp(id, "moveresize_step")) config->moveresize_step = atoi(value);
       if(!strcmp(id, "sloppy_focus")) config->sloppy_focus = !strcmp(value, "true") ? true : false; 
 
@@ -154,7 +153,7 @@ struct simple_config * readConfiguration(char* filename) {
             else if(!strcmp(keys, "A"))   mod |= WLR_MODIFIER_ALT;
             else if(!strcmp(keys, "W"))   mod |= WLR_MODIFIER_LOGO;
             else {
-               keysym = xkb_keysym_from_name(keys, XKB_KEYSYM_CASE_INSENSITIVE);
+               keysym = xkb_keysym_from_name(keys, XKB_KEYSYM_NO_FLAGS);
                do_continue = false;
             }
             token = strtok(NULL, "+");

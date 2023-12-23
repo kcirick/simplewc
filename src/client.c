@@ -1,12 +1,10 @@
 #include <assert.h>
-#include <wayland-server-core.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_shell.h>
-#include <xkbcommon/xkbcommon.h>
 #if XWAYLAND
 #include <wlr/xwayland.h>
 #endif
@@ -49,6 +47,43 @@ toggleClientFixed(struct simple_client *client)
       return;
    }
    client->fixed ^= 1;
+}
+
+void
+killClient(struct simple_client *client)
+{
+#ifdef XWAYLAND
+   if(client->type==XWL_MANAGED_CLIENT || client->type==XWL_UNMANAGED_CLIENT){
+      wlr_xwayland_surface_close(client->xwl_surface);
+      return;
+   }
+#endif
+   wlr_xdg_toplevel_send_close(client->xdg_surface->toplevel);
+}
+
+void
+tileClient(struct simple_client *client, enum Direction direction)
+{
+   say(DEBUG, "tileClient");
+   struct simple_output* output = client->output;
+   int gap_width = output->server->config->tile_gap_width;
+   int bw = output->server->config->border_width;
+
+   struct wlr_box new_geom;
+   if(direction==LEFT){
+      new_geom.x = output->usable_area.x + gap_width + bw;
+      new_geom.y = output->usable_area.y + gap_width + bw;
+      new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
+      new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
+   }
+   if(direction==RIGHT){
+      new_geom.x = output->usable_area.width/2 + gap_width/2 + bw;
+      new_geom.y = output->usable_area.y + gap_width + bw;
+      new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
+      new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
+   }
+   set_client_geometry(client, new_geom);
+   arrange_output(output);
 }
 
 void
@@ -108,7 +143,6 @@ cycleClients(struct simple_output *output){
    // change stacking order but don't actually focus
    wl_list_remove(&client->link);
    wl_list_insert(&client->server->clients, &client->link);
-   //focus_client(client, true);
 }
 
 void 
@@ -131,11 +165,11 @@ begin_interactive(struct simple_client *client, enum CursorMode mode, uint32_t e
    server->cursor_mode = mode;
 
    if(mode == CURSOR_MOVE) {
-      //say(INFO, "CURSOR_MOVE");
+      //say(DEBUG, "CURSOR_MOVE");
       server->grab_x = server->cursor->x - client->geom.x;
       server->grab_y = server->cursor->y - client->geom.y;
    } else {
-      //say(INFO, "CURSOR_RESIZE");
+      //say(DEBUG, "CURSOR_RESIZE");
       struct wlr_box geo_box;
       if(client->type==XDG_SHELL_CLIENT) {
          wlr_xdg_surface_get_geometry(client->xdg_surface, &geo_box);
@@ -181,9 +215,11 @@ get_top_client_from_output(struct simple_output* output)
 {
    struct simple_client *client;
    struct simple_server *server = output->server;
-   wl_list_for_each(client, &server->clients, link)
+   wl_list_for_each(client, &server->clients, link) {
+      if(!client || &client->link == &server->clients) continue; 
       if(VISIBLEON(client, output))
          return client;
+   }
    
    return NULL;
 }
@@ -312,6 +348,7 @@ set_client_geometry(struct simple_client *client, struct wlr_box geom)
       wlr_xdg_toplevel_set_size(client->xdg_surface->toplevel, geom.width, geom.height);
 #if XWAYLAND
    } else {
+      wlr_scene_node_set_position(&client->scene_tree->node, geom.x, geom.y);
       wlr_xwayland_surface_configure(client->xwl_surface, 
             geom.x, 
             geom.y, 
@@ -319,6 +356,8 @@ set_client_geometry(struct simple_client *client, struct wlr_box geom)
             geom.height);
 #endif
    }
+   client->geom = geom;
+
    //borders
    int bw = config->border_width;
    //top
@@ -410,7 +449,7 @@ set_initial_geometry(struct simple_client* client)
 static void 
 map_notify(struct wl_listener *listener, void *data) 
 {
-   say(INFO, "map_notify");
+   say(DEBUG, "client_map_notify");
    struct simple_client *client = wl_container_of(listener, client, map);
    if(client->type==XDG_SHELL_CLIENT)
       client->xdg_surface->surface->data = client->scene_tree;
@@ -448,7 +487,7 @@ map_notify(struct wl_listener *listener, void *data)
 static void 
 unmap_notify(struct wl_listener *listener, void *data) 
 {
-   say(INFO, "unmap_notify");
+   say(DEBUG, "client_unmap_notify");
    struct simple_client *client = wl_container_of(listener, client, unmap);
 
    // reset the cursor mode if the grabbed client was unmapped
@@ -457,18 +496,19 @@ unmap_notify(struct wl_listener *listener, void *data)
       client->server->grabbed_client = NULL;
    }
    
-   wl_list_remove(&client->link);
    client->mapped = false;
    client->fixed = false;
 
+   wl_list_remove(&client->link);
    wlr_scene_node_destroy(&client->scene_tree->node);
 }
 
 static void 
 destroy_notify(struct wl_listener *listener, void *data) 
 {
-   say(INFO, "destroy_notify");
+   say(DEBUG, "client_destroy_notify");
    struct simple_client *client = wl_container_of(listener, client, destroy);
+   struct simple_output * output = client->server->cur_output;
 
    wl_list_remove(&client->destroy.link);
    if(client->type==XDG_SHELL_CLIENT){
@@ -482,8 +522,9 @@ destroy_notify(struct wl_listener *listener, void *data)
       wl_list_remove(&client->request_activate.link);
       wl_list_remove(&client->request_configure.link);
    }
-
    free(client);
+
+   focus_client(get_top_client_from_output(output), true);
 }
 
 // --- XDG Shell ---------------------------------------------------------
@@ -505,7 +546,7 @@ xdg_tl_request_resize_notify(struct wl_listener *listener, void *data)
 void 
 xdg_new_surface_notify(struct wl_listener *listener, void *data)
 {
-   say(INFO, "new_xdg_surface_notify");
+   say(DEBUG, "new_xdg_surface_notify");
    struct simple_server *server = wl_container_of(listener, server, xdg_new_surface);
    struct wlr_xdg_surface *xdg_surface = data;
    struct simple_client* pclient;
@@ -573,13 +614,13 @@ xwl_dissociate_notify(struct wl_listener *listener, void *data)
 static void 
 xwl_request_activate_notify(struct wl_listener *listener, void *data) 
 {
-   say(INFO, "xwl_request_activate_notify");
+   say(DEBUG, "xwl_request_activate_notify");
 }
 
 static void 
 xwl_request_configure_notify(struct wl_listener *listener, void *data) 
 {
-   say(INFO, "xwl_request_configure_notify");
+   say(DEBUG, "xwl_request_configure_notify");
    struct simple_client *client = wl_container_of(listener, client, request_configure);
    struct wlr_xwayland_surface_configure_event *event = data;
    wlr_xwayland_surface_configure(client->xwl_surface, event->x, event->y, event->width, event->height);
@@ -613,7 +654,7 @@ xwl_ready_notify(struct wl_listener *listener, void *data)
 void 
 xwl_new_surface_notify(struct wl_listener *listener, void *data) 
 {
-   say(INFO, "xwayland_new_surface_notify");
+   say(DEBUG, "xwayland_new_surface_notify");
    struct simple_server *server = wl_container_of(listener, server, xwl_new_surface);
    struct wlr_xwayland_surface *xsurface = data;
    wlr_xwayland_surface_ping(xsurface);
