@@ -75,9 +75,9 @@ struct simple_config * readConfiguration(char* filename) {
    if(!(f=fopen(filename, "r")))
       say(ERROR, "Error reading file %s", filename);
 
-   char buffer[64];
+   char buffer[128];
    char id[32];
-   char value[64];
+   char value[128];
    char* token;
    while (fgets(buffer, sizeof buffer, f)){
       if(buffer[0]=='\n' || buffer[0]=='#') continue;

@@ -15,6 +15,7 @@
 #include "server.h"
 
 
+/*
 void
 toggleClientTag(struct simple_client *client, int tag)
 {
@@ -27,6 +28,7 @@ toggleClientTag(struct simple_client *client, int tag)
 
    client->tag ^= TAGMASK(tag);
 }
+*/
 
 void
 sendClientToTag(struct simple_client *client, int tag)
@@ -39,6 +41,15 @@ sendClientToTag(struct simple_client *client, int tag)
 }
 
 void
+toggleClientVisible(struct simple_client *client)
+{
+   say(DEBUG, "toggleClientVisible");
+   client->visible ^= 1;
+
+   focus_client(get_top_client_from_output(client->output), true);
+}
+
+void
 toggleClientFixed(struct simple_client *client) 
 {
    if(client->fixed){
@@ -47,6 +58,27 @@ toggleClientFixed(struct simple_client *client)
       return;
    }
    client->fixed ^= 1;
+}
+
+void
+maximizeClient(struct simple_client *client)
+{
+   if(!client) return;
+
+   int gap_width = client->server->config->tile_gap_width;
+   int bw = client->server->config->border_width;
+
+   struct simple_output* output = client->output;
+
+   struct wlr_box new_geom;
+   new_geom.x = output->usable_area.x + gap_width + bw;
+   new_geom.y = output->usable_area.y + gap_width + bw;
+   new_geom.width = output->usable_area.width - gap_width*2 - bw*2;
+   new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
+
+   set_client_geometry(client, new_geom);
+
+   arrange_output(output);
 }
 
 void
@@ -88,21 +120,38 @@ tileClient(struct simple_client *client, enum Direction direction)
 
 void
 cycleClients(struct simple_output *output){
-   /* from dwl:
-   struct simple_client* client, *selected = get_top_client_from_output(output);
+   say(DEBUG, "cycleClients");
+   // from dwl:
+   struct simple_client* client, *selected;
+   struct simple_server* server = output->server;
+   if(server->grabbed_client)
+      selected = server->grabbed_client;
+   else
+      selected = get_top_client_from_output(output);
+
    if(!selected) return;
 
    wl_list_for_each(client, &selected->link, link) {
       if(&client->link == &output->server->clients)
          continue; // wrap past the sentinel node
-      if(VISIBLEON(client, output))
+      //if(VISIBLEON(client, output))
+      if(client && client->output==output && (client->fixed || client->tag & output->visible_tags))
          break;
    }
-   */
+   //
 
+   /*
    // from labwc
    struct simple_server* server = output->server;
-   struct simple_client* client, *selected = get_top_client_from_output(output);
+   struct simple_client* client, *selected;
+   selected = get_top_client_from_output(output);
+   /
+   wl_list_for_each(client, &server->clients, link) {
+      if(!client || &client->link == &server->clients) continue; 
+      //if(VISIBLEON(client, output))
+      if(client->output==output && (client->fixed || client->tag & output->visible_tags))
+         selected = client;
+   }/
    struct wlr_scene_node *node = &selected->scene_tree->node;
    assert(node->parent);
 
@@ -121,8 +170,11 @@ cycleClients(struct simple_output *output){
          continue;
       }
       client = (struct simple_client*)node->data;
-      if(client && VISIBLEON(client, output)) break; 
+      //if(client && VISIBLEON(client, output)) break; 
+      if(client && client->output==output && (client->fixed || client->tag & output->visible_tags))
+         break;
    } while (client != selected);
+   */
    
    // grab the client
    server->grabbed_client = client;
@@ -141,8 +193,8 @@ cycleClients(struct simple_output *output){
    //---
 
    // change stacking order but don't actually focus
-   wl_list_remove(&client->link);
-   wl_list_insert(&client->server->clients, &client->link);
+   //wl_list_remove(&client->link);
+   //wl_list_insert(&client->server->clients, &client->link);
 }
 
 void 
@@ -416,6 +468,7 @@ focus_client(struct simple_client *client, bool raise)
    wl_list_remove(&client->link);
    wl_list_insert(&client->server->clients, &client->link);
 
+   client->visible = true;
    set_client_activated(client, true);
    set_client_border_colour(client, FOCUSED);
 
@@ -456,11 +509,11 @@ map_notify(struct wl_listener *listener, void *data)
    else
       client->xwl_surface->surface->data = client->scene_tree;
 
-   if(client->mapped) return;
+   if(client->visible) return;
 
    struct simple_server *server = client->server;
    wl_list_insert(&server->clients, &client->link);
-   client->mapped = true;
+   client->visible = true;
    client->fixed = false;
 
    struct wlr_scene_tree *tree = client->type==XDG_SHELL_CLIENT ?
@@ -496,11 +549,12 @@ unmap_notify(struct wl_listener *listener, void *data)
       client->server->grabbed_client = NULL;
    }
    
-   client->mapped = false;
+   client->visible = false;
    client->fixed = false;
 
    wl_list_remove(&client->link);
-   wlr_scene_node_destroy(&client->scene_tree->node);
+   if(client->scene_tree)
+      wlr_scene_node_destroy(&client->scene_tree->node);
 }
 
 static void 
@@ -580,9 +634,9 @@ xdg_new_surface_notify(struct wl_listener *listener, void *data)
    xdg_client->scene_tree->node.data = xdg_client;
    xdg_surface->data = xdg_client;
 
+   LISTEN(&xdg_surface->surface->events.destroy, &xdg_client->destroy, destroy_notify);
    LISTEN(&xdg_surface->surface->events.map, &xdg_client->map, map_notify);
    LISTEN(&xdg_surface->surface->events.unmap, &xdg_client->unmap, unmap_notify);
-   LISTEN(&xdg_surface->surface->events.destroy, &xdg_client->destroy, destroy_notify);
 
    struct wlr_xdg_toplevel *toplevel = xdg_surface->toplevel;
    LISTEN(&toplevel->events.request_move, &xdg_client->request_move, xdg_tl_request_move_notify);

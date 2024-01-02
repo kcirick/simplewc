@@ -21,7 +21,7 @@
 #define LISTEN(E, L, H)    wl_signal_add((E), ((L)->notify = (H), (L)))
 #define LENGTH(X)          (sizeof X / sizeof X[0])
 #define TAGMASK(T)         (1 << (T))
-#define VISIBLEON(C, O)    ((O) && (C)->output==(O) && ((C)->fixed || ((C)->tag & (O)->visible_tags)))
+#define VISIBLEON(C, O)    ((O) && (C)->output==(O) && (C)->visible && ((C)->fixed || ((C)->tag & (O)->visible_tags)))
 #define MIN(A, B)          ((A)<(B) ? (A) : (B))
 #define MAX(A, B)          ((A)>(B) ? (A) : (B))
 
@@ -38,6 +38,7 @@ enum LayerType          { LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, LyrLo
 enum NodeDescriptorType { NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP };
 enum Direction          { LEFT, RIGHT, UP, DOWN };
 
+//--- structs -----
 struct simple_config {
    int n_tags;
    char tag_names[MAX_TAGS][32];
@@ -74,7 +75,7 @@ struct mousemap {
 
 struct autostart {
    struct wl_list link;
-   char command[64];
+   char command[128];
 };
 
 //--- global variables -----

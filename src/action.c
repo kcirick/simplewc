@@ -31,11 +31,14 @@ key_function(struct simple_server *server, struct keymap *keymap)
    struct wlr_surface *surface = server->seat->keyboard_state.focused_surface;
    struct simple_client* client;
    get_client_from_surface(surface, &client, NULL);
+   //client = get_top_client_from_output(server->cur_output);
    if(client && keymap->keyfn==CLIENT) {
       if(!strcmp(keymap->argument, "send_to_tag"))    sendClientToTag(client, keymap->keysym-XKB_KEY_1);
       if(!strcmp(keymap->argument, "cycle"))          cycleClients(client->output);
       if(!strcmp(keymap->argument, "toggle_fixed"))   toggleClientFixed(client);
+      if(!strcmp(keymap->argument, "toggle_visible")) toggleClientVisible(client);
       if(!strcmp(keymap->argument, "kill"))           killClient(client);
+      if(!strcmp(keymap->argument, "maximize"))       maximizeClient(client);
       if(!strcmp(keymap->argument, "tile_left"))      tileClient(client, LEFT);
       if(!strcmp(keymap->argument, "tile_right"))     tileClient(client, RIGHT);
       if(!strcmp(keymap->argument, "move")){

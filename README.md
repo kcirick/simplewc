@@ -37,9 +37,20 @@ Still a work in progress, and not in a working state yet. Stay tuned...
 [ghit]: https://github.com/kcirick/swc/issues
 
 
+## Screenshots
+
+v0.1
+
+<a href="https://i.redd.it/mqvdzk97038c1.jpeg" target="_blank"><img src="https://i.redd.it/mqvdzk97038c1.jpeg" width="350" /></a>
+
 ## Version Log
 
   - 0.2 (Work in progress)
+    - Goal: add in additional features
+    - Added visibility toggle (a.k.a. iconify) and maximize functionality
+    - Added support for wlr_idle_notifier_v1, wlr_idle_inhibit_v1, and wlr_session_lock_manager_v1
+    - Added support for wlr_output_power_management_v1
+    - Improve client cycling function
   - 0.1 (2023-12-23) ([download][v01])
     - Goal: get the base code in working order
 

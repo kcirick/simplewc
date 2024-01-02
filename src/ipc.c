@@ -97,6 +97,7 @@ ipc_manager_get_output(struct wl_client *client, struct wl_resource *resource, u
 	ipc_output_printstatus_to(ipc_output);
 }
 
+//--- IPC output implementation ------------------------------------------
 void
 ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
 {
@@ -147,13 +148,13 @@ ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
 	zdwl_ipc_output_v2_send_frame(ipc_output->resource);
 }
 
-//--- IPC output implementation ------------------------------------------
 void
 ipc_output_release(struct wl_client *client, struct wl_resource *resource)
 {
 	wl_resource_destroy(resource);
 }
 
+//--- IPC output set implementation --------------------------------------
 void
 ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *resource, uint32_t and_tags, uint32_t xor_tags)
 {

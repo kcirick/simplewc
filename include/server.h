@@ -63,17 +63,30 @@ struct simple_server {
    struct wl_listener request_set_selection;
    struct wl_listener request_set_primary_selection;
 
+   struct simple_input_method_relay *im_relay;
+   struct wlr_text_input_manager_v3 *text_input;
+   struct wlr_input_method_manager_v2 *input_method;
+
+
+   // session idle notifier
    struct wlr_idle_notifier_v1 *idle_notifier;
    struct wlr_idle_inhibit_manager_v1 *idle_inhibit_manager;
    struct wl_listener new_inhibitor;
    struct wl_listener inhibitor_destroy;
 
+   // session lock
    struct wlr_session_lock_manager_v1 *session_lock_manager;
    struct wlr_scene_rect *locked_bg;
    struct wlr_session_lock_v1 *cur_lock;
    struct wl_listener new_lock_session_manager;
    struct wl_listener lock_session_manager_destroy;
+   bool locked;
 
+   // session power manager
+   struct wlr_output_power_manager_v1 *output_power_manager;
+   struct wl_listener output_pm_set_mode;
+
+   // background layer
    struct wlr_scene_rect *root_bg;
 
    struct simple_client *grabbed_client;
@@ -99,6 +112,10 @@ struct simple_output {
    unsigned int current_tag;
    unsigned int visible_tags;
 
+   struct wlr_session_lock_surface_v1 *lock_surface;
+   struct wl_listener lock_surface_destroy;
+
+   struct wlr_box full_area;
    struct wlr_box usable_area;
 };
 
@@ -114,6 +131,36 @@ struct simple_input {
    struct wl_listener destroy;
 };
 
+/*
+struct simple_input_method_relay {
+   struct wl_list text_inputs;
+   struct wlr_input_method_v2 *input_method;
+
+   struct wl_listener text_input_new;
+   
+   struct wl_listener input_method_new;
+   struct wl_listener input_method_commit;
+   struct wl_listener input_method_grab_keyboard;
+   struct wl_listener input_method_destroy;
+
+   struct wl_listener input_method_keyboard_grab_destroy;
+};
+
+struct simple_text_input {
+   struct wl_list link;
+   struct simple_input_method_relay *relay;
+   struct wlr_text_input_v3 *input;
+
+   struct wlr_surface *pending_focused_surface;
+
+   struct wl_listener pending_focused_surface_destroy;
+
+   struct wl_listener text_input_enable;
+   struct wl_listener text_input_commit;
+   struct wl_listener text_input_disable;
+   struct wl_listener text_input_destroy;
+};*/
+
 struct client_outline {
    struct wlr_scene_tree *tree;
    int line_width;
@@ -123,6 +170,16 @@ struct client_outline {
    struct wlr_scene_rect *left;
    struct wlr_scene_rect *right;
 
+   struct wl_listener destroy;
+};
+
+struct simple_session_lock {
+   struct simple_server *server;
+   struct wlr_scene_tree *scene;
+
+   struct wlr_session_lock_v1 *lock;
+   struct wl_listener new_surface;
+   struct wl_listener unlock;
    struct wl_listener destroy;
 };
 

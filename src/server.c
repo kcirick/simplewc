@@ -16,6 +16,7 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_output_management_v1.h>
+#include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_presentation_time.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_session_lock_v1.h>
@@ -36,6 +37,10 @@
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 //
+#include <wlr/types/wlr_input_method_v2.h>
+#include <wlr/types/wlr_text_input_v3.h>
+//#include <wlr/types/wlr_foreign_toplevel_management_v1.h>
+
 #include <wlr/util/log.h>
 #if XWAYLAND
 #include <wlr/xwayland.h>
@@ -247,6 +252,112 @@ new_inhibitor_notify(struct wl_listener *listener, void *data)
 }
 
 static void
+output_pm_set_mode_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "output_pm_set_mode_notify");
+   struct simple_server *server = wl_container_of(listener, server, output_pm_set_mode);
+   struct wlr_output_power_v1_set_mode_event *event = data;
+
+   switch (event->mode) {
+      case ZWLR_OUTPUT_POWER_V1_MODE_OFF:
+         wlr_output_enable(event->output, false);
+         wlr_output_commit(event->output);
+         break;
+      case ZWLR_OUTPUT_POWER_V1_MODE_ON:
+         wlr_output_enable(event->output, true);
+         if(!wlr_output_test(event->output))
+            wlr_output_rollback(event->output);
+         wlr_output_commit(event->output);
+
+         // reset the cursor image
+         //cursor_image(&server->seat);
+         wlr_cursor_unset_image(server->cursor);
+         wlr_cursor_set_xcursor(server->cursor, server->cursor_manager, "left_ptr");;
+         break;
+   }
+}
+
+//--- Lock session notify functions --------------------------------------
+static void
+lock_surface_destroy_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "lock_surface_destroy_notify");
+   struct simple_output *output = wl_container_of(listener, output, lock_surface_destroy);
+   struct wlr_session_lock_surface_v1 *lock_surface = output->lock_surface;
+   struct simple_server *server = output->server;
+
+   output->lock_surface = NULL;
+   wl_list_remove(&output->lock_surface_destroy.link);
+
+   if(lock_surface->surface != server->seat->keyboard_state.focused_surface)
+      return;
+
+   if(server->locked && server->cur_lock && !wl_list_empty(&server->cur_lock->surfaces)){
+      struct wlr_session_lock_surface_v1 *surface = wl_container_of(server->cur_lock->surfaces.next, surface, link);
+      input_focus_surface(server, surface->surface);
+   } else if(!(server->locked)){
+      //focus_client();
+   } else {
+      wlr_seat_keyboard_clear_focus(server->seat);
+   }
+}
+
+static void
+new_lock_surface_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "new_lock_surface_notify");
+   struct simple_session_lock *slock = wl_container_of(listener, slock, new_surface);
+   struct simple_server *server = slock->server;
+   struct wlr_session_lock_surface_v1 *lock_surface = data;
+   struct simple_output *output = lock_surface->output->data;
+   struct wlr_scene_tree *scene_tree = wlr_scene_subsurface_tree_create(slock->scene, lock_surface->surface);
+   lock_surface->surface->data = scene_tree;
+   output->lock_surface = lock_surface;
+   
+   wlr_scene_node_set_position(&scene_tree->node, output->full_area.x, output->full_area.y);
+   wlr_session_lock_surface_v1_configure(lock_surface, output->full_area.width, output->full_area.height);
+
+   LISTEN(&lock_surface->events.destroy, &output->lock_surface_destroy, lock_surface_destroy_notify);
+   
+   if(output == server->cur_output)
+      input_focus_surface(server, lock_surface->surface);
+}
+
+static void
+unlock_session_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "unlock_session_notify");
+   struct simple_session_lock *slock = wl_container_of(listener, slock, unlock);
+   struct simple_server *server = slock->server;
+   
+   //destroylock(lock, 1);
+   server->locked = false;
+   wlr_seat_keyboard_notify_clear_focus(server->seat);
+
+   wlr_scene_node_set_enabled(&server->locked_bg->node, 0);
+   //focus_client()
+}
+
+static void
+lock_session_destroy_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "lock_session_destroy_notify");
+   struct simple_session_lock *slock = wl_container_of(listener, slock, destroy);
+   struct simple_server *server = slock->server;
+
+   //destroylock(lock, 0);
+   wlr_seat_keyboard_notify_clear_focus(server->seat);
+
+   wl_list_remove(&slock->new_surface.link);
+   wl_list_remove(&slock->unlock.link);
+   wl_list_remove(&slock->destroy.link);
+
+   wlr_scene_node_destroy(&slock->scene->node);
+   server->cur_lock = NULL;
+   free(slock);
+}
+
+static void
 lock_session_manager_destroy_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "lock_session_manager_destroy_notify");
@@ -260,10 +371,28 @@ static void
 new_lock_session_manager_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "new_lock_session_manager_notify");
-   //struct wlr_session_lock_v1 *session_lock = data;
+   struct simple_server* server = wl_container_of(listener, server, new_lock_session_manager); 
+   struct wlr_session_lock_v1 *session_lock = data;
 
-   //struct simple_session_lock* slock;
-   // ...
+   wlr_scene_node_set_enabled(&server->locked_bg->node, 1);
+   if(server->cur_lock){
+      wlr_session_lock_v1_destroy(session_lock);
+      return;
+   }
+
+   //focusclient(NULL, 0);
+   struct simple_session_lock *slock = calloc(1, sizeof(struct simple_session_lock));
+   slock->scene = wlr_scene_tree_create(server->layer_tree[LyrLock]);
+   server->cur_lock = slock->lock = session_lock;
+   server->locked = true;
+   session_lock->data = slock;
+   slock->server = server;
+
+   LISTEN(&session_lock->events.new_surface, &slock->new_surface, new_lock_surface_notify);
+   LISTEN(&session_lock->events.unlock, &slock->unlock, unlock_session_notify);
+   LISTEN(&session_lock->events.destroy, &slock->destroy, lock_session_destroy_notify);
+
+   wlr_session_lock_v1_send_locked(session_lock);
 }
 
 //--- Output notify functions --------------------------------------------
@@ -415,6 +544,7 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_scene_node_lower_to_bottom(&server->layer_tree[LyrBg]->node);
    wlr_scene_node_raise_to_top(&server->layer_tree[LyrTop]->node);
    wlr_scene_node_raise_to_top(&server->layer_tree[LyrOverlay]->node);
+   wlr_scene_node_raise_to_top(&server->layer_tree[LyrLock]->node);
 
    //set default tag
    output->current_tag = TAGMASK(0);
@@ -429,6 +559,9 @@ new_output_notify(struct wl_listener *listener, void *data)
    // update background and lock geometry
    struct wlr_box geom;
    wlr_output_layout_get_box(server->output_layout, NULL, &geom);
+
+   memset(&output->full_area, 0, sizeof(output->full_area));
+   output->full_area = geom;
    
    wlr_scene_node_set_position(&server->root_bg->node, geom.x, geom.y);
    wlr_scene_rect_set_size(server->root_bg, geom.width, geom.height);
@@ -479,8 +612,12 @@ kb_modifiers_notify(struct wl_listener *listener, void *data)
             server->grabbed_client_outline=NULL;
          }
 
+         // change stacking order and focus client 
+         wl_list_remove(&client->link);
+         wl_list_insert(&client->server->clients, &client->link);
          focus_client(client, true);
          keyboard->server->grabbed_client=NULL;
+         arrange_output(server->cur_output);
       }
    }
 
@@ -500,6 +637,8 @@ kb_key_notify(struct wl_listener *listener, void *data)
    
    bool handled = false;
    uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->keyboard);
+
+   wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
 
    if(event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
       for(int i=0; i<nsyms; i++){
@@ -586,6 +725,12 @@ static void
 process_cursor_motion(struct simple_server *server, uint32_t time) 
 {
    //say(DEBUG, "process_cursor_motion");
+
+   // time is 0 in internal calls meant to restore point focus
+   if(time>0){
+      wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
+   }
+
    if(server->cursor_mode == CURSOR_MOVE) {
       process_cursor_move(server, time);
       return;
@@ -647,6 +792,10 @@ cursor_button_notify(struct wl_listener *listener, void *data)
    // Notify the client with pointer focus that a button press has occurred
    wlr_seat_pointer_notify_button(server->seat, event->time_msec, event->button, event->state);
 
+   wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
+
+   if(server->locked) return;
+
    double sx, sy;
    struct wlr_surface *surface = NULL;
    //uint32_t resize_edges;
@@ -687,6 +836,7 @@ cursor_axis_notify(struct wl_listener *listener, void *data)
    struct simple_server *server = wl_container_of(listener, server, cursor_axis);
    struct wlr_pointer_axis_event *event = data;
 
+   wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
    wlr_seat_pointer_notify_axis(server->seat, event->time_msec, event->orientation, event->delta, event->delta_discrete, event->source);
 }
 
@@ -805,6 +955,21 @@ new_input_notify(struct wl_listener *listener, void *data)
 }
 
 //------------------------------------------------------------------------
+void
+relay_input_method_notify(struct wl_listener *listener, void* data)
+{
+   //
+   say(DEBUG, "relay_input_method_notify");
+}
+
+void
+relay_text_input_notify(struct wl_listener *listener, void* data)
+{
+   //
+   say(DEBUG, "relay_text_input_notify");
+}
+
+//------------------------------------------------------------------------
 void 
 prepareServer(struct simple_server *server, struct wlr_session *session, int info_level) 
 {
@@ -899,6 +1064,18 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
    LISTEN(&server->cursor->events.axis, &server->cursor_axis, cursor_axis_notify);
    LISTEN(&server->cursor->events.frame, &server->cursor_frame, cursor_frame_notify);
 
+   //input method init
+   //wlr_foreign_toplevel_manager_v1_create(server->display);
+   server->input_method = wlr_input_method_manager_v2_create(server->display);
+   server->text_input = wlr_text_input_manager_v3_create(server->display);
+   
+   /*
+   server->im_relay = calloc(1, sizeof(struct simple_input_method_relay));
+   wl_list_init(&server->im_relay->text_inputs);
+
+   LISTEN(&server->text_input->events.text_input, &server->im_relay->text_input_new, relay_text_input_notify);
+   LISTEN(&server->input_method->events.input_method, &server->im_relay->input_method_new, relay_input_method_notify);
+   */
 
    // set up Wayland shells, i.e. XDG and XWayland
    wl_list_init(&server->clients);
@@ -914,13 +1091,20 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
    //unmanaged surfaces
    // ...
 
+   // set up idle notifier and inhibit manager
    server->idle_notifier = wlr_idle_notifier_v1_create(server->display);
    server->idle_inhibit_manager = wlr_idle_inhibit_v1_create(server->display);
    LISTEN(&server->idle_inhibit_manager->events.new_inhibitor, &server->new_inhibitor, new_inhibitor_notify);
 
+   // set up session lock manager
    server->session_lock_manager = wlr_session_lock_manager_v1_create(server->display);
    LISTEN(&server->session_lock_manager->events.new_lock, &server->new_lock_session_manager, new_lock_session_manager_notify);
    LISTEN(&server->session_lock_manager->events.destroy, &server->lock_session_manager_destroy, lock_session_manager_destroy_notify);
+
+   // set up output power manager
+   server->output_power_manager = wlr_output_power_manager_v1_create(server->display);
+   LISTEN(&server->output_power_manager->events.set_mode, &server->output_pm_set_mode, output_pm_set_mode_notify);
+
    // set initial size - will be updated when output is changed
    server->locked_bg = wlr_scene_rect_create(server->layer_tree[LyrLock], 1, 1, (float [4]){0.1, 0.1, 0.1, 1.0});
    wlr_scene_node_set_enabled(&server->locked_bg->node, 0);

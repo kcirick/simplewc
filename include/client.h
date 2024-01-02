@@ -35,18 +35,21 @@ struct simple_client {
    uint32_t tag;
    bool fixed;
 
-   bool mapped;
+   //bool mapped;
+   bool visible;
 
    // geometry of the wlr_surface within the view as currently displayed
    struct wlr_box geom;
 };
    
-void toggleClientTag(struct simple_client*, int);
+//void toggleClientTag(struct simple_client*, int);
 void sendClientToTag(struct simple_client*, int);
 void toggleClientFixed(struct simple_client*);
+void toggleClientVisible(struct simple_client*);
 void cycleClients(struct simple_output*);
 void killClient(struct simple_client*);
 void tileClient(struct simple_client*, enum Direction);
+void maximizeClient(struct simple_client*);
 
 char * get_client_title(struct simple_client*);
 char * get_client_appid(struct simple_client*);
