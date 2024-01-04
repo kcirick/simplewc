@@ -5,7 +5,7 @@ to teach myself the basics of window management. (formerly SimpleWay).
 
 ## Description
 
- - Minimal stacking window manager for Wayland using wlroots
+ - Minimal stacking window manager for Wayland using wlroots (currently based on wlroots v0.17)
  - Not meant to be tiny or fast, but aims for simplicity in design and coding
  - Written in C
  - Built upon [tinywl], inspirations from [dwl] and [labwc]
@@ -47,11 +47,13 @@ v0.1
 
   - 0.2 (Work in progress)
     - Goal: add in additional features
+    - Uses wlroots v0.17
     - Added visibility toggle (a.k.a. iconify) and maximize functionality
     - Added support for wlr_idle_notifier_v1, wlr_idle_inhibit_v1, and wlr_session_lock_manager_v1
     - Added support for wlr_output_power_management_v1
     - Improve client cycling function
   - 0.1 (2023-12-23) ([download][v01])
     - Goal: get the base code in working order
+    - Uses wlroots v0.17
 
 [v01]: https://github.com/kcirick/swc/archive/refs/tags/v0.1.tar.gz
