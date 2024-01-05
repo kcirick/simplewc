@@ -49,8 +49,9 @@ v0.1
     - Goal: add in additional features
     - Uses wlroots v0.17
     - Added visibility toggle (a.k.a. iconify) and maximize functionality
-    - Added support for wlr_idle_notifier_v1, wlr_idle_inhibit_v1, and wlr_session_lock_manager_v1
-    - Added support for wlr_output_power_management_v1
+    - Added support for wlr_idle_notifier_v1, wlr_idle_inhibit_v1, and wlr_session_lock_manager_v1 (e.g. swaylock)
+    - Added support for wlr_output_power_management_v1 (e.g. wlopm)
+    - Added support for dragging icons
     - Improve client cycling function
   - 0.1 (2023-12-23) ([download][v01])
     - Goal: get the base code in working order

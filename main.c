@@ -103,7 +103,7 @@ main(int argc, char **argv)
          exit(EXIT_SUCCESS);
       }
       else if(!strcmp(iarg, "--help")) {
-         say(INFO, "Usage: swwm [--config file][--debug][--version][--help]");
+         say(INFO, "Usage: swc [--config file][--debug][--version][--help]");
          exit(EXIT_SUCCESS);
       }
    }

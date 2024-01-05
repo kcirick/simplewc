@@ -1,9 +1,10 @@
 # SWC Config
 
-n_tags = 5
-tag_names = One;Two;Three;Four;Five
+n_tags = 3
 
 border_width = 3
+tile_gap_width = 10
+sloppy_focus = false
 moveresize_step = 10
 
 background_colour = #222222
@@ -11,18 +12,41 @@ background_colour = #222222
 border_colour_focus = #1793D0
 border_colour_unfocus = #333333 
 border_colour_urgent = #FF0000 
-border_colour_marked = #00FF00 
 border_colour_fixed = #0000FF
 border_colour_outline = #FFFFFF
+
+#--- Autostarts (in sequence -----
+#AUTOSTART = swayidle -w timeout 900 'swaylock -c 000000'
+#AUTOSTART = waybar
 
 #--- Key Bindings -----
 KEY = A+q QUIT 0
 KEY = S+A+Return SPAWN foot
+#--- Client actions
 KEY = A+Tab CLIENT cycle
 KEY = A+k CLINET kill
-
+#--- Tags
 KEY = A+1 TAG select
 KEY = A+2 TAG select
 KEY = A+3 TAG select
-KEY = A+4 TAG select
-KEY = A+5 TAG select
+KEY = A+C+1 TAG toggle
+KEY = A+C+2 TAG toggle
+KEY = A+C+3 TAG toggle
+KEY = A+S+1 CLIENT send_to_tag
+KEY = A+S+2 CLIENT send_to_tag
+KEY = A+S+3 CLIENT send_to_tag
+#--- Move/Resize
+KEY = A+Left CLIENT move
+KEY = A+Right CLIENT move
+KEY = A+Up CLIENT move
+KEY = A+Down CLIENT move
+KEY = A+S+Left CLIENT resize
+KEY = A+S+Right CLIENT resize
+KEY = A+S+Up CLIENT resize
+KEY = A+S+Down CLIENT resize
+#--- Tiling (auto-tile)
+KEY = A+t TAG tile
+#--- Manual tiling
+KEY = W+S+Left Client tile_left
+KEY = W+S+Right Client tile_right
+

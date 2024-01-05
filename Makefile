@@ -10,7 +10,6 @@ MY_LFLAGS = $(LDFLAGS) -lwayland-server -lxkbcommon\
 
 WL_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wayland-protocols)
 WL_SCANNER=$(shell pkg-config --variable=wayland_scanner wayland-scanner)
-WLR_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wlr-protocols)
 
 SOURCES = src/client.c src/action.c src/config.c src/layer.c src/server.c src/ipc.c \
 			 src/dwl-ipc-unstable-v2-protocol.c main.c
@@ -26,65 +25,69 @@ CPURPLE  = "\\033[35m"
 CRESET   = "\\033[0m"
 
 #-------------------------------------------------------------------------
-all: $(TARGET) swc-msg 
+all: objdir $(TARGET) swc-msg 
 
 include/wlr-output-power-management-unstable-v1-protocol.h:
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
-	@$(WL_SCANNER) server-header $(WLR_PROTOCOLS)/unstable/wlr-output-power-management-unstable-v1.xml $@
+	@echo " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@$(WL_SCANNER) server-header protocols/wlr-output-power-management-unstable-v1.xml $@
 
 include/wlr-layer-shell-unstable-v1-protocol.h:
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
-	@$(WL_SCANNER) server-header $(WLR_PROTOCOLS)/unstable/wlr-layer-shell-unstable-v1.xml $@
+	@echo " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@$(WL_SCANNER) server-header protocols/wlr-layer-shell-unstable-v1.xml $@
 
 include/xdg-shell-protocol.h:
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@echo " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) server-header $(WL_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
 
 include/dwl-ipc-unstable-v2-protocol.h:
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@echo " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) server-header protocols/dwl-ipc-unstable-v2.xml $@
 
 src/dwl-ipc-unstable-v2-protocol.c:
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@echo " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) private-code protocols/dwl-ipc-unstable-v2.xml $@
 
 util/dwl-ipc-unstable-v2-protocol.h:
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@echo " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) client-header protocols/dwl-ipc-unstable-v2.xml $@
 
 util/dwl-ipc-unstable-v2-protocol.c:
-	@echo -e " [ $(CGREEN)WL$(CRESET) ] Creating $@"
+	@echo " [ $(CGREEN)WL$(CRESET) ] Creating $@"
 	@$(WL_SCANNER) private-code protocols/dwl-ipc-unstable-v2.xml $@
 
 #-----
-obj/%.o: %.c $(HEADERS)
-	@echo -e " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
+obj/%.o: %.c $(HEADERS) 
+	@echo " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
 	@$(CC) $(MY_CFLAGS) -Iinclude -o $@ -c $<
 
-obj/%.o: src/%.c $(HEADERS)
-	@echo -e " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
+obj/%.o: src/%.c $(HEADERS) 
+	@echo " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
 	@$(CC) $(MY_CFLAGS) -Iinclude -o $@ -c $<
+
+objdir:
+	@echo " [ $(CYELLOW)MKDIR$(CRESET) ] obj"
+	@mkdir -p obj
 
 $(TARGET): $(OBJECTS) 
-	@echo -e " [ $(CPURPLE)BIN$(CRESET) ] $(TARGET)"
+	@echo " [ $(CPURPLE)BIN$(CRESET) ] $(TARGET)"
 	@$(CC) -o $@ $(OBJECTS) $(MY_LFLAGS)
 
 swc-msg: util/swc-msg.c util/dwl-ipc-unstable-v2-protocol.h util/dwl-ipc-unstable-v2-protocol.c
-	@echo -e " [ $(CPURPLE)BIN$(CRESET) ] $@"
+	@echo " [ $(CPURPLE)BIN$(CRESET) ] $@"
 	@$(CC) -o $@ $^ -Iinclude -lwayland-client
 
 clean:
-	@echo -e " [ $(CRED)RM$(CRESET) ] $(TARGET)"
+	@echo " [ $(CRED)RM$(CRESET) ] $(TARGET)"
 	@rm -f $(TARGET)
-	@echo -e " [ $(CRED)RM$(CRESET) ] swc-msg"
+	@echo " [ $(CRED)RM$(CRESET) ] swc-msg"
 	@rm -f swc-msg
-	@echo -e " [ $(CRED)RM$(CRESET) ] $(OBJECTS)"
+	@echo " [ $(CRED)RM$(CRESET) ] $(OBJECTS)"
 	@rm -f $(OBJECTS)
-	@echo -e " [ $(CRED)RM$(CRESET) ] wlr-layer-shell-unstable-v1-protocol.h xdg-shell-protocol.h wlr-output-power-manangement-unstable-v1-protocol.h"
+	@echo " [ $(CRED)RM$(CRESET) ] wlr-layer-shell-unstable-v1-protocol.h xdg-shell-protocol.h wlr-output-power-manangement-unstable-v1-protocol.h"
 	@rm -f include/wlr-layer-shell-unstable-v1-protocol.h include/xdg-shell-protocol.h include/wlr-output-power-management-unstable-v1-protocol.h
-	@echo -e " [ $(CRED)RM$(CRESET) ] src/dwl-ipc-unstable-v2-protocol.c include/dwl-ipc-unstable-v2-protocol.h"
+	@echo " [ $(CRED)RM$(CRESET) ] src/dwl-ipc-unstable-v2-protocol.c include/dwl-ipc-unstable-v2-protocol.h"
 	@rm -f src/dwl-ipc-unstable-v2-protocol.c include/dwl-ipc-unstable-v2-protocol.h
-	@echo -e " [ $(CRED)RM$(CRESET) ] util/dwl-ipc-unstable-v2-protocol.c util/dwl-ipc-unstable-v2-protocol.h"
+	@echo " [ $(CRED)RM$(CRESET) ] util/dwl-ipc-unstable-v2-protocol.c util/dwl-ipc-unstable-v2-protocol.h"
 	@rm -f util/dwl-ipc-unstable-v2-protocol.c util/dwl-ipc-unstable-v2-protocol.h
 	@echo
 
@@ -97,4 +100,4 @@ info:
 	@echo "CFLAGS  = $(MY_CFLAGS)"
 	@echo "LFLAGS  = $(MY_LFLAGS)"
 
-.PHONY: all clean info
+.PHONY: obj all clean info

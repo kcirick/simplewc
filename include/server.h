@@ -63,6 +63,11 @@ struct simple_server {
    struct wl_listener request_set_selection;
    struct wl_listener request_set_primary_selection;
 
+   struct wlr_scene_tree *drag_icon;
+   struct wl_listener request_start_drag;
+   struct wl_listener start_drag;
+   struct wl_listener destroy_drag_icon;
+
    struct simple_input_method_relay *im_relay;
    struct wlr_text_input_manager_v3 *text_input;
    struct wlr_input_method_manager_v2 *input_method;

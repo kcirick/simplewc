@@ -633,7 +633,10 @@ kb_key_notify(struct wl_listener *listener, void *data)
 
    uint32_t keycode = event->keycode + 8;
    const xkb_keysym_t *syms;
-   int nsyms = xkb_state_key_get_syms(keyboard->keyboard->xkb_state, keycode, &syms);
+   //int nsyms = xkb_state_key_get_syms(keyboard->keyboard->xkb_state, keycode, &syms);
+   xkb_layout_index_t layout_index = xkb_state_key_get_layout(keyboard->keyboard->xkb_state, keycode);
+   int nsyms = xkb_keymap_key_get_syms_by_level(keyboard->keyboard->keymap, 
+      keycode, layout_index, 0, &syms);
    
    bool handled = false;
    uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->keyboard);
@@ -730,6 +733,9 @@ process_cursor_motion(struct simple_server *server, uint32_t time)
    if(time>0){
       wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
    }
+
+   // update drag icon's position
+   wlr_scene_node_set_position(&server->drag_icon->node, server->cursor->x, server->cursor->y);
 
    if(server->cursor_mode == CURSOR_MOVE) {
       process_cursor_move(server, time);
@@ -877,6 +883,39 @@ request_set_primary_selection_notify(struct wl_listener *listener, void *data)
    struct simple_server *server = wl_container_of(listener, server, request_set_primary_selection);
    struct wlr_seat_request_set_primary_selection_event *event = data;
    wlr_seat_set_primary_selection(server->seat, event->source, event->serial);
+}
+
+static void
+destroy_drag_icon_notify(struct wl_listener *listener, void *data)
+{
+   struct simple_server *server = wl_container_of(listener, server, destroy_drag_icon);
+
+   focus_client(get_top_client_from_output(server->cur_output), true);
+}
+
+static void
+request_start_drag_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "request_start_drag_notify");
+   struct simple_server *server = wl_container_of(listener, server, request_start_drag);
+   struct wlr_seat_request_start_drag_event *event = data;
+
+   if(wlr_seat_validate_pointer_grab_serial(server->seat, event->origin, event->serial))
+      wlr_seat_start_pointer_drag(server->seat, event->drag, event->serial);
+   else
+      wlr_data_source_destroy(event->drag->source);
+}
+
+static void
+start_drag_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "start_drag_notify");
+   struct simple_server *server = wl_container_of(listener, server, start_drag);
+   struct wlr_drag *drag = data;
+   if(!drag->icon) return;
+
+   drag->icon->data = &wlr_scene_drag_icon_create(server->drag_icon, drag->icon)->node;
+   LISTEN(&drag->icon->events.destroy, &server->destroy_drag_icon, destroy_drag_icon_notify);
 }
 
 //--- Input notify function ----------------------------------------------
@@ -1047,8 +1086,11 @@ prepareServer(struct simple_server *server, struct wlr_session *session, int inf
    LISTEN(&server->seat->events.request_set_cursor, &server->request_cursor, request_cursor_notify);
    LISTEN(&server->seat->events.request_set_selection, &server->request_set_selection, request_set_selection_notify);
    LISTEN(&server->seat->events.request_set_primary_selection, &server->request_set_primary_selection, request_set_primary_selection_notify);
-   //LISTEN(&server->seat->events.request_set_drag, &server->request_set_drag, request_set_drag_notify);
-   //LISTEN(&server->seat->events.start_drag, &server->start_drag, start_drag_notify);
+
+   server->drag_icon = wlr_scene_tree_create(&server->scene->tree);
+   wlr_scene_node_place_below(&server->drag_icon->node, &server->layer_tree[LyrLock]->node);
+   LISTEN(&server->seat->events.request_start_drag, &server->request_start_drag, request_start_drag_notify);
+   LISTEN(&server->seat->events.start_drag, &server->start_drag, start_drag_notify);
 
    server->cursor = wlr_cursor_create();
    wlr_cursor_attach_output_layout(server->cursor, server->output_layout); 
