@@ -12,6 +12,7 @@ struct simple_client {
    struct wlr_xwayland_surface *xwl_surface;
 #endif
    struct wlr_scene_tree *scene_tree;
+   struct wlr_scene_tree *scene_surface_tree;
    struct wlr_scene_rect *border[4]; // top, bottom, left, right
 
    struct wl_listener map;
@@ -28,8 +29,9 @@ struct simple_client {
    struct wl_listener surface_destroy;
    struct wl_listener request_activate;
    struct wl_listener request_configure;
-   struct wl_listener set_app_id;
-   struct wl_listener override_redirect;
+   struct wl_listener set_hints;
+   struct wl_listener set_title;
+   struct wl_listener request_fullscreen;
 #endif
 
    uint32_t tag;
@@ -53,8 +55,8 @@ void maximizeClient(struct simple_client*);
 
 char * get_client_title(struct simple_client*);
 char * get_client_appid(struct simple_client*);
-struct simple_client* get_top_client_from_output(struct simple_output*);
-struct simple_client* get_client_at(struct simple_server*, double, double, struct wlr_surface**, double*, double*);
+struct simple_client* get_top_client_from_output(struct simple_output*, bool);
+int get_client_at(struct simple_server*, double, double, struct simple_client**, struct wlr_surface**, double*, double*);
 int get_client_from_surface(struct wlr_surface*, struct simple_client**, struct simple_layer_surface**);
 void focus_client(struct simple_client*, bool);
 void begin_interactive(struct simple_client*, enum CursorMode, uint32_t);

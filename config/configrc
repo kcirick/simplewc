@@ -50,3 +50,7 @@ KEY = A+t TAG tile
 KEY = W+S+Left Client tile_left
 KEY = W+S+Right Client tile_right
 
+#--- Mouse Bindings -----
+MOUSE = A+Button1 CLIENT move
+MOUSE = A+Button3 CLIENT resize
+MOUSE = Button1 ROOT test

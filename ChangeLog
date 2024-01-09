@@ -1,0 +1,17 @@
+TODO
+	* : 
+
+2024-01-09
+	* globals.h: Adjust VISIBLEON() macro to remove client->visible flag
+	* client.c: Make client cycling work even if all clients are hidden (not visible)
+	* client.c: get_client_at() function optimization
+	* client.c: focus_client() restacks X11 windows properly to fix ignored mouse focus in dialog boxes
+	* client.c: Add XCB hints for XWayland clients
+
+2024-01-05
+	* ChangeLog: Adding changelog to track changes
+	* input.c: Move input related items from server.c to input.c
+	* client.c: implement unmanaged xwayland surfaces
+	* action.c: Fix crash when client action is called with no clients
+	* config.c, action.c, input.c: implement mouse action
+	* input.c: process_cursor_move, process_cursor_resize, check for null client to prevent seg fault when modifier is released during move/resize

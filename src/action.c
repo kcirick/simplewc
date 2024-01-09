@@ -25,16 +25,21 @@ key_function(struct simple_server *server, struct keymap *keymap)
       if(!strcmp(keymap->argument, "select"))   setCurrentTag(server, keymap->keysym-XKB_KEY_1, false);
       if(!strcmp(keymap->argument, "toggle"))   setCurrentTag(server, keymap->keysym-XKB_KEY_1, true);
       if(!strcmp(keymap->argument, "tile"))     tileTag(server);
+
+      arrange_output(server->cur_output);
    }
 
    //--- CLIENT -----
    struct wlr_surface *surface = server->seat->keyboard_state.focused_surface;
    struct simple_client* client;
-   get_client_from_surface(surface, &client, NULL);
-   //client = get_top_client_from_output(server->cur_output);
-   if(client && keymap->keyfn==CLIENT) {
+   int type = get_client_from_surface(surface, &client, NULL);
+
+   say(DEBUG, "type = %d", type);
+   if(keymap->keyfn==CLIENT) {
+      if(!strcmp(keymap->argument, "cycle"))          cycleClients(server->cur_output);
+
+      if(type<0) return;
       if(!strcmp(keymap->argument, "send_to_tag"))    sendClientToTag(client, keymap->keysym-XKB_KEY_1);
-      if(!strcmp(keymap->argument, "cycle"))          cycleClients(client->output);
       if(!strcmp(keymap->argument, "toggle_fixed"))   toggleClientFixed(client);
       if(!strcmp(keymap->argument, "toggle_visible")) toggleClientVisible(client);
       if(!strcmp(keymap->argument, "kill"))           killClient(client);
@@ -61,17 +66,15 @@ key_function(struct simple_server *server, struct keymap *keymap)
 }
 
 void 
-mouse_function(struct simple_client *client, struct mousemap *mousemap)
+mouse_function(struct simple_client *client, struct mousemap *mousemap, int resize_edges)
 {
    say(DEBUG, "mouse_function");
-   /*
-   if(context==CONTEXT_ROOT){
-      if(argument=="test") test();
+   if(mousemap->context==CONTEXT_ROOT){
+      if(!strcmp(mousemap->argument, "test"))   say(INFO, "test()");
    }
-   if(context==CONTEXT_CLIENT){
+   if(mousemap->context==CONTEXT_CLIENT){
       if(!client) return;
-      if(argument=="move") client->dragMove();
-      if(argument=="resize") client->dragResize();
+      if(!strcmp(mousemap->argument, "move"))   begin_interactive(client, CURSOR_MOVE, 0);
+      if(!strcmp(mousemap->argument, "resize")) begin_interactive(client, CURSOR_RESIZE, resize_edges);
    }
-   */
 }

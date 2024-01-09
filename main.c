@@ -17,8 +17,8 @@
 
 static const char *msg_str[NMSG] = { "DEBUG", "INFO", "WARNING", "ERROR" };
 static int info_level = WLR_SILENT;
-static struct wlr_session *g_session;
 
+static struct wlr_session *g_session;
 struct simple_server* g_server;
 
 //------------------------------------------------------------------------
@@ -130,9 +130,9 @@ main(int argc, char **argv)
 
    g_server->config = readConfiguration(config_file);
 
-   prepareServer(g_server, g_session, info_level);
+   prepareServer(g_session, info_level);
    
-   startServer(g_server);
+   startServer();
 
    // Run autostarts and startup comand if defined
    if(start_cmd[0]!='\0') spawn(start_cmd);
@@ -143,7 +143,7 @@ main(int argc, char **argv)
 
    wl_display_run(g_server->display);
    
-   cleanupServer(g_server);
+   cleanupServer();
      
    return EXIT_SUCCESS;
 }

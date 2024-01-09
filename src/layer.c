@@ -101,7 +101,7 @@ layer_surface_unmap_notify(struct wl_listener *listener, void *data)
    if(wlr_lsurface->output && (lsurface->output = wlr_lsurface->output->data))
       arrange_layers(lsurface->output);
    if(wlr_lsurface->surface == lsurface->server->seat->keyboard_state.focused_surface)
-      focus_client(get_top_client_from_output(lsurface->server->cur_output), false);
+      focus_client(get_top_client_from_output(lsurface->server->cur_output, false), false);
 }
 
 static void 

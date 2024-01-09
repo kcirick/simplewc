@@ -1,6 +1,5 @@
 [Desktop Entry]
 Name=SWC
 Comment=Simple Wayland Compositor
-Exec=/home/lfs/rueno/.local/bin/swc
+Exec=/usr/local/bin/swc
 Type=Application
-DesktopNames=wlroots

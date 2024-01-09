@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
+#include <linux/input-event-codes.h>
 #include <wlr/types/wlr_keyboard.h>
 
 #include "globals.h"
@@ -136,14 +137,14 @@ struct simple_config * readConfiguration(char* filename) {
          strncpy(function, token, sizeof function);
          trim(function);
 
-         char args[32];
+         char args[64];
          token = strtok(NULL, "");
          strncpy(args, token, sizeof args);
          trim(args);
 
          uint32_t mod = 0;
          xkb_keysym_t keysym;
-         char keys[16];
+         char keys[32];
          token = strtok(binding, "+");
          strncpy(keys, token, sizeof keys);
          bool do_continue = true;
@@ -176,7 +177,55 @@ struct simple_config * readConfiguration(char* filename) {
       }
 
       if(!strcmp(id, "MOUSE")){
-         // TODO
+         char binding[32];
+         token = strtok(value, " ");
+         strncpy(binding, token, sizeof binding);
+         trim(binding);
+         
+         char context[32];
+         token = strtok(NULL, " ");
+         strncpy(context, token, sizeof context);
+         trim(context);
+
+         char args[64];
+         token = strtok(NULL, "");
+         strncpy(args, token, sizeof args);
+         trim(args);
+
+         unsigned int mod = 0;
+         unsigned int button;
+         char button_char[32];
+         token = strtok(binding, "+");
+         strncpy(button_char, token, sizeof button_char);
+         bool do_continue = true;
+         while(do_continue) {
+                 if(!strcmp(button_char, "S"))  mod |= WLR_MODIFIER_SHIFT;
+            else if(!strcmp(button_char, "C"))  mod |= WLR_MODIFIER_CTRL;
+            else if(!strcmp(button_char, "A"))  mod |= WLR_MODIFIER_ALT;
+            else if(!strcmp(button_char, "W"))  mod |= WLR_MODIFIER_LOGO;
+            else {
+                    if(!strcmp(button_char, "Button_Left"))  button = BTN_LEFT;
+               else if(!strcmp(button_char, "Button_Right"))  button = BTN_RIGHT;
+               else if(!strcmp(button_char, "Button_Middle"))  button = BTN_MIDDLE;
+
+               do_continue = false;
+            }
+
+            token = strtok(NULL, "+");
+            if(token)   strncpy(button_char, token, sizeof button_char);
+         }
+
+         int this_context = -1;
+              if(!strcmp(context, "ROOT"))   this_context = CONTEXT_ROOT;
+         else if(!strcmp(context, "CLIENT")) this_context = CONTEXT_CLIENT;
+
+         struct mousemap *mousebind = calloc(1, sizeof(struct mousemap));
+         mousebind->mask = mod;
+         mousebind->button = button;
+         mousebind->context = this_context;
+         strncpy(mousebind->argument, args, sizeof mousebind->argument);
+
+         wl_list_insert(&config->mouse_bindings, &mousebind->link);
       }
 
       if(!strcmp(id, "AUTOSTART")){

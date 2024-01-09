@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <string.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
@@ -11,24 +12,10 @@
 
 #include "globals.h"
 #include "layer.h"
+#include "input.h"
 #include "client.h"
 #include "server.h"
 
-
-/*
-void
-toggleClientTag(struct simple_client *client, int tag)
-{
-   say(DEBUG, "toggleClientTag");
-   // ...
-   if(!client) return;
-
-   // Do not toggle if result is NULL
-   if(tag == client->tag) return;
-
-   client->tag ^= TAGMASK(tag);
-}
-*/
 
 void
 sendClientToTag(struct simple_client *client, int tag)
@@ -46,7 +33,7 @@ toggleClientVisible(struct simple_client *client)
    say(DEBUG, "toggleClientVisible");
    client->visible ^= 1;
 
-   focus_client(get_top_client_from_output(client->output), true);
+   focus_client(get_top_client_from_output(client->output, false), true);
 }
 
 void
@@ -78,7 +65,7 @@ maximizeClient(struct simple_client *client)
 
    set_client_geometry(client, new_geom);
 
-   arrange_output(output);
+   //arrange_output(output);
 }
 
 void
@@ -105,17 +92,17 @@ tileClient(struct simple_client *client, enum Direction direction)
    if(direction==LEFT){
       new_geom.x = output->usable_area.x + gap_width + bw;
       new_geom.y = output->usable_area.y + gap_width + bw;
-      new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
-      new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
    }
    if(direction==RIGHT){
-      new_geom.x = output->usable_area.width/2 + gap_width/2 + bw;
+      new_geom.x = output->usable_area.x + output->usable_area.width/2 + gap_width/2 + bw;
       new_geom.y = output->usable_area.y + gap_width + bw;
-      new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
-      new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
    }
+   new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
+   new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
+
+   say(DEBUG, " >> %d %d %d %d", new_geom.x, new_geom.y, new_geom.width, new_geom.height);
    set_client_geometry(client, new_geom);
-   arrange_output(output);
+   //arrange_output(output);
 }
 
 void
@@ -127,15 +114,14 @@ cycleClients(struct simple_output *output){
    if(server->grabbed_client)
       selected = server->grabbed_client;
    else
-      selected = get_top_client_from_output(output);
+      selected = get_top_client_from_output(output, true);
 
    if(!selected) return;
 
    wl_list_for_each(client, &selected->link, link) {
-      if(&client->link == &output->server->clients)
+      if(&client->link == &server->clients)
          continue; // wrap past the sentinel node
-      //if(VISIBLEON(client, output))
-      if(client && client->output==output && (client->fixed || client->tag & output->visible_tags))
+      if(VISIBLEON(client, output))
          break;
    }
    //
@@ -202,9 +188,10 @@ begin_interactive(struct simple_client *client, enum CursorMode mode, uint32_t e
 {
    // this function sets up an interactive move or resize operation
    struct simple_server *server = client->server;
-   struct wlr_surface *focused_surface = server->seat->pointer_state.focused_surface;
+   //struct wlr_surface *focused_surface = server->seat->pointer_state.focused_surface;
    
    // do not move/request unfocused clients
+   /*
    if(client->type==XDG_SHELL_CLIENT) {
       if(client->xdg_surface->surface != wlr_surface_get_root_surface(focused_surface)) 
          return;
@@ -212,6 +199,7 @@ begin_interactive(struct simple_client *client, enum CursorMode mode, uint32_t e
       if(client->xwl_surface->surface != wlr_surface_get_root_surface(focused_surface))
          return;
    }
+   */
 
    server->grabbed_client = client;
    server->cursor_mode = mode;
@@ -263,46 +251,48 @@ get_client_appid(struct simple_client* client)
 }
 
 struct simple_client*
-get_top_client_from_output(struct simple_output* output)
+get_top_client_from_output(struct simple_output* output, bool include_hidden)
 {
    struct simple_client *client;
    struct simple_server *server = output->server;
    wl_list_for_each(client, &server->clients, link) {
       if(!client || &client->link == &server->clients) continue; 
-      if(VISIBLEON(client, output))
+      if((include_hidden || client->visible) && VISIBLEON(client, output))
          return client;
    }
    
    return NULL;
 }
 
-struct simple_client* 
-get_client_at(struct simple_server *server, double lx, double ly, struct wlr_surface **surface, double *sx, double *sy) 
+int
+get_client_at(struct simple_server *server, double lx, double ly, struct simple_client **client, struct wlr_surface **surface, double *sx, double *sy) 
 {
-   //say(DEBUG, "client_at()");
+  // say(DEBUG, "client_at()");
+   struct simple_client* this_client = NULL;
+   struct wlr_scene_node* pnode;
+   struct wlr_scene_surface *scene_surface = NULL;
    struct wlr_scene_node *node = wlr_scene_node_at(&server->scene->tree.node, lx, ly, sx, sy);
-   if(node == NULL || node->type != WLR_SCENE_NODE_BUFFER) return NULL;
+   if(node == NULL || node->type != WLR_SCENE_NODE_BUFFER) return -1;
 
    struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-   struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
-   if(!scene_surface) return NULL;
+   scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
 
-   *surface = scene_surface->surface;
+   // go back until the first client
+   for(pnode=node; pnode && !this_client; pnode = &pnode->parent->node){
+      this_client = pnode->data;
+   }
 
-   struct wlr_scene_tree *tree = node->parent;
-   while(tree != NULL && tree->node.data==NULL)
-      tree = tree->node.parent;
+   if(!this_client) return -1;
 
-   if(!tree) return NULL;
-
-   struct simple_client* client = tree->node.data;
-   if(!client) return NULL;
-
-   //say(DEBUG, "client_at(): found node parent");
-   if(client->type == LAYER_SHELL_CLIENT){
-      return NULL;
-   } else
-      return tree->node.data;
+   if(this_client->type == LAYER_SHELL_CLIENT){
+      if(surface) *surface = scene_surface->surface;
+      if(client)  *client = NULL;
+      return this_client->type;
+   } else {
+      if(surface) *surface = scene_surface->surface;
+      if(client)  *client = this_client;
+      return this_client->type;
+   }
 }
 
 void 
@@ -332,7 +322,7 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
 #ifdef XWAYLAND
    struct wlr_xwayland_surface *xs = wlr_xwayland_surface_try_from_wlr_surface(root_surface);
    if (xs){
-      say(DEBUG, "XS");
+      //say(DEBUG, "XS");
       *client = xs->data;
       type = (*client)->type;
       return type;
@@ -341,7 +331,7 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
 
    struct wlr_layer_surface_v1 *ls = wlr_layer_surface_v1_try_from_wlr_surface(root_surface);
    if(ls) {
-      say(DEBUG, "LAYER");
+      //say(DEBUG, "LAYER");
       *lsurface = ls->data; 
       type = (*lsurface)->type;
       return type;
@@ -353,7 +343,7 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
       tmp_s = NULL;
       switch(s->role){
          case WLR_XDG_SURFACE_ROLE_POPUP:
-            say(DEBUG, "POPUP");
+            //say(DEBUG, "POPUP");
             if(!s->popup || !s->popup->parent)
                return -1;
             tmp_s = wlr_xdg_surface_try_from_wlr_surface(s->popup->parent);
@@ -365,7 +355,7 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
             s = tmp_s;
             break;
          case WLR_XDG_SURFACE_ROLE_TOPLEVEL:
-            say(DEBUG, "TOPLEVEL");
+            //say(DEBUG, "XDG TOPLEVEL");
             *client = s->data;
             type = (*client)->type;
             return type;
@@ -397,10 +387,12 @@ set_client_geometry(struct simple_client *client, struct wlr_box geom)
    struct simple_config *config = client->server->config;
    if(client->type==XDG_SHELL_CLIENT){
       wlr_scene_node_set_position(&client->scene_tree->node, geom.x, geom.y);
+      wlr_scene_node_set_position(&client->scene_surface_tree->node, 0, 0);
       wlr_xdg_toplevel_set_size(client->xdg_surface->toplevel, geom.width, geom.height);
 #if XWAYLAND
    } else {
       wlr_scene_node_set_position(&client->scene_tree->node, geom.x, geom.y);
+      wlr_scene_node_set_position(&client->scene_surface_tree->node, 0, 0);
       wlr_xwayland_surface_configure(client->xwl_surface, 
             geom.x, 
             geom.y, 
@@ -450,29 +442,40 @@ focus_client(struct simple_client *client, bool raise)
    struct simple_client* old_client=NULL;
    struct simple_layer_surface* old_lsurface = NULL;
 
-   if(raise)
+   if(raise){
       wlr_scene_node_raise_to_top(&client->scene_tree->node);
-   
+      if(client->type != XWL_UNMANAGED_CLIENT){
+         wl_list_remove(&client->link);
+         wl_list_insert(&client->server->clients, &client->link);
+         // restack X11 windows
+         if(client->type==XWL_MANAGED_CLIENT)
+            wlr_xwayland_surface_restack(client->xwl_surface, NULL, XCB_STACK_MODE_ABOVE);
+      }
+   }
+
    struct wlr_surface *prev_surface = server->seat->keyboard_state.focused_surface;
    if(prev_surface==surface) return;
 
    if(prev_surface){
       old_client_type = get_client_from_surface(prev_surface, &old_client, &old_lsurface);
-      if(old_client_type == XDG_SHELL_CLIENT || old_client_type == XWL_MANAGED_CLIENT){
+      if(client->type!= XWL_UNMANAGED_CLIENT && (old_client_type == XDG_SHELL_CLIENT || old_client_type == XWL_MANAGED_CLIENT)){
          //deactivate the previously focused surface.
          set_client_activated(old_client, false);
          set_client_border_colour(old_client, UNFOCUSED);
       }
    }
    
-   wl_list_remove(&client->link);
-   wl_list_insert(&client->server->clients, &client->link);
-
    client->visible = true;
    set_client_activated(client, true);
-   set_client_border_colour(client, FOCUSED);
+   if(client->type != XWL_UNMANAGED_CLIENT)
+      set_client_border_colour(client, FOCUSED);
+   
+   // change cursor surface
+   //process_cursor_motion(server, 0);
 
    input_focus_surface(server, surface);
+
+   print_server_info();
 }
 
 void 
@@ -504,37 +507,63 @@ map_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "client_map_notify");
    struct simple_client *client = wl_container_of(listener, client, map);
-   if(client->type==XDG_SHELL_CLIENT)
-      client->xdg_surface->surface->data = client->scene_tree;
-   else
-      client->xwl_surface->surface->data = client->scene_tree;
+   struct simple_server *server = client->server;
+   struct simple_output* op = server->cur_output;
 
    if(client->visible) return;
 
-   struct simple_server *server = client->server;
-   wl_list_insert(&server->clients, &client->link);
+   client->scene_tree = wlr_scene_tree_create(client->server->layer_tree[LyrClient]);
+   client->scene_tree->node.data = client;
+
+   client->scene_surface_tree = client->type==XDG_SHELL_CLIENT ?
+      wlr_scene_xdg_surface_create(client->scene_tree, client->xdg_surface) :
+      wlr_scene_subsurface_tree_create(client->scene_tree, client->xwl_surface->surface);
+   client->scene_surface_tree->node.data = client;
+
+   if(client->type==XDG_SHELL_CLIENT) {
+      client->xdg_surface->surface->data = client->scene_tree;
+      client->xdg_surface->data = client;
+   } else {
+      client->xwl_surface->surface->data = client->scene_tree;
+      client->xwl_surface->data = client;
+   }
+
+   client->output = op;
+   client->tag = op->current_tag;
    client->visible = true;
    client->fixed = false;
 
-   struct wlr_scene_tree *tree = client->type==XDG_SHELL_CLIENT ?
-      wlr_scene_xdg_surface_create(client->scene_tree, client->xdg_surface) :
-      wlr_scene_subsurface_tree_create(client->scene_tree, client->xwl_surface->surface);
-   if(!tree) return;
-
-   set_initial_geometry(client);
-
-   struct wlr_output *output = wlr_output_layout_output_at(server->output_layout, client->geom.x, client->geom.y);
-   if(output){
-      struct simple_output* op = output->data;
-      client->output = op;
-      client->tag = op->current_tag;
+   // Handle unmanaged clients first
+   if(client->type==XWL_UNMANAGED_CLIENT){
+      get_client_geometry(client, &client->geom);
+      wlr_scene_node_reparent(&client->scene_tree->node, server->layer_tree[LyrOverlay]);
+      wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
+      if(wlr_xwayland_or_surface_wants_focus(client->xwl_surface))
+         focus_client(client, true);
+      return;
    }
+
+   if(client->type==XWL_MANAGED_CLIENT){
+      struct wlr_xwayland_surface *xsurface = client->xwl_surface;
+      for(int i=0; i<xsurface->window_type_len; i++)
+         if(xsurface->window_type[i] == server->netatom[NetWMWindowTypeDialog]
+            || xsurface->window_type[i] == server->netatom[NetWMWindowTypeSplash]
+            || xsurface->window_type[i] == server->netatom[NetWMWindowTypeToolbar]
+            || xsurface->window_type[i] == server->netatom[NetWMWindowTypeUtility]){
+            say(DEBUG, " >>> XWL POPUP");
+            //client->type = XWL_POPUP;
+            //wlr_scene_node_reparent(&client->scene_tree->node, server->layer_tree[LyrOverlay]);
+         }
+   }
+   
+   wl_list_insert(&server->clients, &client->link);
+   set_initial_geometry(client);
 
    wlr_scene_node_reparent(&client->scene_tree->node, server->layer_tree[LyrClient]);
 
    focus_client(client, true);
 
-   print_server_info(server);
+   print_server_info();
 }
 
 static void 
@@ -552,7 +581,12 @@ unmap_notify(struct wl_listener *listener, void *data)
    client->visible = false;
    client->fixed = false;
 
-   wl_list_remove(&client->link);
+   if(client->type==XWL_UNMANAGED_CLIENT){
+      if(client->xwl_surface->surface == client->server->seat->keyboard_state.focused_surface)
+         focus_client(get_top_client_from_output(client->server->cur_output, false), true);
+   } else
+      wl_list_remove(&client->link);
+
    if(client->scene_tree)
       wlr_scene_node_destroy(&client->scene_tree->node);
 }
@@ -576,9 +610,10 @@ destroy_notify(struct wl_listener *listener, void *data)
       wl_list_remove(&client->request_activate.link);
       wl_list_remove(&client->request_configure.link);
    }
+
    free(client);
 
-   focus_client(get_top_client_from_output(output), true);
+   focus_client(get_top_client_from_output(output, false), true);
 }
 
 // --- XDG Shell ---------------------------------------------------------
@@ -630,10 +665,6 @@ xdg_new_surface_notify(struct wl_listener *listener, void *data)
    xdg_client->type = XDG_SHELL_CLIENT;
    xdg_client->xdg_surface = xdg_surface;
 
-   xdg_client->scene_tree = wlr_scene_tree_create(server->layer_tree[LyrClient]);
-   xdg_client->scene_tree->node.data = xdg_client;
-   xdg_surface->data = xdg_client;
-
    LISTEN(&xdg_surface->surface->events.destroy, &xdg_client->destroy, destroy_notify);
    LISTEN(&xdg_surface->surface->events.map, &xdg_client->map, map_notify);
    LISTEN(&xdg_surface->surface->events.unmap, &xdg_client->unmap, unmap_notify);
@@ -669,6 +700,9 @@ static void
 xwl_request_activate_notify(struct wl_listener *listener, void *data) 
 {
    say(DEBUG, "xwl_request_activate_notify");
+   struct simple_client *client = wl_container_of(listener, client, request_activate);
+   if(client->type==XWL_MANAGED_CLIENT)
+      wlr_xwayland_surface_activate(client->xwl_surface, 1);
 }
 
 static void 
@@ -680,19 +714,52 @@ xwl_request_configure_notify(struct wl_listener *listener, void *data)
    wlr_xwayland_surface_configure(client->xwl_surface, event->x, event->y, event->width, event->height);
 }
 
-//------------------------------------------------------------------------
-void 
-xwl_unmanaged_create(struct simple_server *server, struct wlr_xwayland_surface *xsurface) 
+static void
+xwl_set_hints_notify(struct wl_listener *listener, void *data)
 {
-   //
-   say(DEBUG, "xwayland_unmanaged_create");
+   say(DEBUG, "xwl_set_hints_notify");
 }
 
+static void
+xwl_set_title_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "xwl_set_title_notify");
+}
+
+static void
+xwl_request_fullscreen_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "xwl_request_fullscreen_notify");
+}
+
+xcb_atom_t
+getatom(xcb_connection_t *xc, const char *name)
+{
+   xcb_atom_t atom = 0;
+   xcb_intern_atom_reply_t *reply;
+   xcb_intern_atom_cookie_t cookie = xcb_intern_atom(xc, 0, strlen(name), name);
+   if ((reply = xcb_intern_atom_reply(xc, cookie, NULL)))
+      atom = reply->atom;
+   free(reply);
+   return atom;
+}
+
+//------------------------------------------------------------------------
 void 
 xwl_ready_notify(struct wl_listener *listener, void *data) 
 {
    say(DEBUG, "xwl_ready_notify");
    struct simple_server *server = wl_container_of(listener, server, xwl_ready);
+
+   xcb_connection_t *xc = xcb_connect(server->xwayland->display_name, NULL);
+   int err = xcb_connection_has_error(xc);
+   if(err)
+      say(WARNING, "xcb_connect to X server failed with code %d", err);
+
+   server->netatom[NetWMWindowTypeDialog] = getatom(xc, "_NET_WM_WINDOW_TYPE_DIALOG");
+   server->netatom[NetWMWindowTypeSplash] = getatom(xc, "_NET_WM_WINDOW_TYPE_SPLASH");
+   server->netatom[NetWMWindowTypeToolbar] = getatom(xc, "_NET_WM_WINDOW_TYPE_TOOLBAR");
+   server->netatom[NetWMWindowTypeUtility] = getatom(xc, "_NET_WM_WINDOW_TYPE_UTILITY");
 
    wlr_xwayland_set_seat(server->xwayland, server->seat);
    
@@ -703,6 +770,8 @@ xwl_ready_notify(struct wl_listener *listener, void *data)
       wlr_xwayland_set_cursor(server->xwayland, image->buffer, 
             image->width*4, image->width, image->height, image->hotspot_x, image->hotspot_y);
    }
+
+   xcb_disconnect(xc);
 }
 
 void 
@@ -711,22 +780,12 @@ xwl_new_surface_notify(struct wl_listener *listener, void *data)
    say(DEBUG, "xwayland_new_surface_notify");
    struct simple_server *server = wl_container_of(listener, server, xwl_new_surface);
    struct wlr_xwayland_surface *xsurface = data;
-   wlr_xwayland_surface_ping(xsurface);
-
-   if(xsurface->override_redirect){
-      xwl_unmanaged_create(server, xsurface);
-      return;
-   }
 
    // Create simple_client for this surface 
    struct simple_client *xwl_client = calloc(1, sizeof(struct simple_client));
    xwl_client->server = server;
-   xwl_client->type = XWL_MANAGED_CLIENT;
+   xwl_client->type = xsurface->override_redirect ? XWL_UNMANAGED_CLIENT : XWL_MANAGED_CLIENT;
    xwl_client->xwl_surface = xsurface;
-
-   xwl_client->scene_tree = wlr_scene_tree_create(server->layer_tree[LyrClient]);
-   xwl_client->scene_tree->node.data = xwl_client;
-   xsurface->data = xwl_client;
 
    LISTEN(&xsurface->events.associate, &xwl_client->associate, xwl_associate_notify);
    LISTEN(&xsurface->events.dissociate, &xwl_client->dissociate, xwl_dissociate_notify);
@@ -734,7 +793,10 @@ xwl_new_surface_notify(struct wl_listener *listener, void *data)
 
    LISTEN(&xsurface->events.request_activate, &xwl_client->request_activate, xwl_request_activate_notify);
    LISTEN(&xsurface->events.request_configure, &xwl_client->request_configure, xwl_request_configure_notify);
+   LISTEN(&xsurface->events.request_fullscreen, &xwl_client->request_fullscreen, xwl_request_fullscreen_notify);
 
+   LISTEN(&xsurface->events.set_hints, &xwl_client->set_hints, xwl_set_hints_notify);
+   LISTEN(&xsurface->events.set_title, &xwl_client->set_title, xwl_set_title_notify);
    // More mappings
 }
 

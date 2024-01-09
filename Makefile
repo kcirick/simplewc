@@ -4,16 +4,18 @@ TARGET  = swc
 CC = gcc
 MY_CFLAGS = $(CFLAGS) -g -Wall -DVERSION=\"$(VERSION)\" \
    -DWLR_USE_UNSTABLE -DXWAYLAND \
-   $(shell pkg-config --cflags wlroots)
+   $(shell pkg-config --cflags wlroots) \
+   $(shell pkg-config --cflags xcb)
 MY_LFLAGS = $(LDFLAGS) -lwayland-server -lxkbcommon\
-   $(shell pkg-config --libs wlroots)
+   $(shell pkg-config --libs wlroots) \
+   $(shell pkg-config --libs xcb)
 
 WL_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wayland-protocols)
 WL_SCANNER=$(shell pkg-config --variable=wayland_scanner wayland-scanner)
 
-SOURCES = src/client.c src/action.c src/config.c src/layer.c src/server.c src/ipc.c \
+SOURCES = src/client.c src/action.c src/config.c src/layer.c src/server.c src/ipc.c src/input.c \
 			 src/dwl-ipc-unstable-v2-protocol.c main.c
-HEADERS = include/client.h include/action.h include/globals.h include/layer.h include/server.h include/ipc.h \
+HEADERS = include/client.h include/action.h include/globals.h include/layer.h include/server.h include/ipc.h include/input.h \
 			 include/wlr-layer-shell-unstable-v1-protocol.h include/xdg-shell-protocol.h include/dwl-ipc-unstable-v2-protocol.h \
 			 include/wlr-output-power-management-unstable-v1-protocol.h
 OBJECTS = $(addprefix obj/, $(notdir $(SOURCES:.c=.o)))

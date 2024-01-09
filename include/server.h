@@ -2,6 +2,9 @@
 #define SERVER_H
 
 #include <wlr/types/wlr_scene.h>
+#if XWAYLAND
+#include <wlr/xwayland.h>
+#endif
 
 struct simple_server {
    struct wl_display *display;
@@ -94,6 +97,8 @@ struct simple_server {
    // background layer
    struct wlr_scene_rect *root_bg;
 
+   xcb_atom_t netatom[NetLast];
+
    struct simple_client *grabbed_client;
    struct client_outline *grabbed_client_outline;
    double grab_x, grab_y;
@@ -124,48 +129,6 @@ struct simple_output {
    struct wlr_box usable_area;
 };
 
-struct simple_input {
-   struct wl_list link;
-   struct simple_server *server;
-   struct wlr_input_device *device;
-   struct wlr_keyboard *keyboard;
-
-   enum InputType type;
-   struct wl_listener kb_modifiers;
-   struct wl_listener kb_key;
-   struct wl_listener destroy;
-};
-
-/*
-struct simple_input_method_relay {
-   struct wl_list text_inputs;
-   struct wlr_input_method_v2 *input_method;
-
-   struct wl_listener text_input_new;
-   
-   struct wl_listener input_method_new;
-   struct wl_listener input_method_commit;
-   struct wl_listener input_method_grab_keyboard;
-   struct wl_listener input_method_destroy;
-
-   struct wl_listener input_method_keyboard_grab_destroy;
-};
-
-struct simple_text_input {
-   struct wl_list link;
-   struct simple_input_method_relay *relay;
-   struct wlr_text_input_v3 *input;
-
-   struct wlr_surface *pending_focused_surface;
-
-   struct wl_listener pending_focused_surface_destroy;
-
-   struct wl_listener text_input_enable;
-   struct wl_listener text_input_commit;
-   struct wl_listener text_input_disable;
-   struct wl_listener text_input_destroy;
-};*/
-
 struct client_outline {
    struct wlr_scene_tree *tree;
    int line_width;
@@ -179,7 +142,6 @@ struct client_outline {
 };
 
 struct simple_session_lock {
-   struct simple_server *server;
    struct wlr_scene_tree *scene;
 
    struct wlr_session_lock_v1 *lock;
@@ -191,15 +153,13 @@ struct simple_session_lock {
 struct client_outline* client_outline_create(struct wlr_scene_tree*, float*, int);
 void client_outline_set_size(struct client_outline*, int, int);
 
-void print_server_info(struct simple_server*);
+void print_server_info();
 void setCurrentTag(struct simple_server*, int, bool);
 void tileTag(struct simple_server*);
 void arrange_output(struct simple_output*);
 
-void input_focus_surface(struct simple_server*, struct wlr_surface*);
-
-void prepareServer(struct simple_server*, struct wlr_session*, int);
-void startServer(struct simple_server*);
-void cleanupServer(struct simple_server*);
+void prepareServer(struct wlr_session*, int);
+void startServer();
+void cleanupServer();
 
 #endif
