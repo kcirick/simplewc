@@ -48,7 +48,7 @@ ipc_manager_bind(struct wl_client *client, void *data, uint32_t version, uint32_
 	wl_resource_set_implementation(manager_resource, &ipc_manager_implementation, NULL, ipc_manager_destroy);
 
 	//zdwl_ipc_manager_v2_send_tags(manager_resource, MAX_TAGS);
-	zdwl_ipc_manager_v2_send_tags(manager_resource, g_server->config->n_tags);
+	zdwl_ipc_manager_v2_send_tags(manager_resource, g_config->n_tags);
 
 	//for (int i = 0; i < LENGTH(layouts); i++)
 	//	zdwl_ipc_manager_v2_send_layout(manager_resource, layouts[i].symbol);
@@ -82,7 +82,6 @@ ipc_manager_get_output(struct wl_client *client, struct wl_resource *resource, u
 {
 	struct simple_ipc_output *ipc_output;
 	struct simple_output *sop = wlr_output_from_resource(output)->data;
-   //struct simple_server *server = sop->server;
 
 	struct wl_resource *output_resource = wl_resource_create(client, &zdwl_ipc_output_v2_interface, wl_resource_get_version(resource), id);
 	if (!output_resource)
@@ -102,22 +101,21 @@ void
 ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
 {
 	struct simple_output *output = ipc_output->output;
-   struct simple_server *server = output->server;
 	struct simple_client *c, *focused;
 	int tagmask, state, numclients, focused_client, tag;
    char *title, *appid;
 	
    focused = get_top_client_from_output(output, false);
-	zdwl_ipc_output_v2_send_active(ipc_output->resource, output == server->cur_output);
+	zdwl_ipc_output_v2_send_active(ipc_output->resource, output == g_server->cur_output);
 
    ///////////////////////////////////////////
-   for (tag = 0 ; tag < server->config->n_tags; tag++) {
+   for (tag = 0 ; tag < g_config->n_tags; tag++) {
       numclients = state = focused_client = 0;
 		tagmask = 1 << tag;
 		if ((tagmask & output->visible_tags) != 0)
 			state |= ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE;
 
-		wl_list_for_each(c, &server->clients, link) {
+		wl_list_for_each(c, &g_server->clients, link) {
 			if (c->output != output)
 				continue;
 			if (!(c->tag & tagmask))
@@ -167,7 +165,6 @@ ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *resourc
 	if (!ipc_output) return;
 
 	output = ipc_output->output;
-   struct simple_server* server = output->server;
 	selected_client = get_top_client_from_output(output, false);
 	if (!selected_client) return;
 
@@ -175,8 +172,7 @@ ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *resourc
 	if (!newtags) return;
 
 	selected_client->tag = newtags;
-	//focusclient(get_top_client_from_output(server->cur_output), 1);
-	arrange_output(server->cur_output);
+	arrange_output(g_server->cur_output);
 	print_server_info();
 }
 
@@ -225,7 +221,6 @@ ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint
 	//output->tagset[monitor->seltags] = newtags;
 	output->visible_tags = newtags;
    if(toggle_tagset) output->current_tag = newtags;
-	//focusclient(focustop(monitor), 1);
 	arrange_output(output);
 	print_server_info();
 }

@@ -1,4 +1,3 @@
-#include <unistd.h>
 #include <ctype.h>
 #include <string.h>
 #include <linux/input-event-codes.h>
@@ -6,7 +5,9 @@
 
 #include "globals.h"
 
-void colour2rgba(const char *color, float dest[static 4]) {
+void 
+colour2rgba(const char *color, float dest[static 4]) 
+{
    if(color[0] == '#') ++color;
 
    int len = strlen(color);
@@ -22,7 +23,9 @@ void colour2rgba(const char *color, float dest[static 4]) {
    dest[3] = 255.0 / 255.0;
 }
 
-void trim(char *orig) {
+void 
+trim(char *orig) 
+{
    size_t i, len;
 
    if(orig==NULL) return;
@@ -45,7 +48,9 @@ void trim(char *orig) {
 }
 
 //------------------------------------------------------------------------
-void set_defaults(struct simple_config *config){
+void 
+set_defaults(struct simple_config *config)
+{
    config->n_tags = 4;
    config->border_width = 2;
    config->sloppy_focus = false;
@@ -60,17 +65,16 @@ void set_defaults(struct simple_config *config){
    colour2rgba("#FFFFFF", config->border_colour[OUTLINE]);
 }
 
-struct simple_config * readConfiguration(char* filename) {
-
-   struct simple_config * config = calloc(1, sizeof(struct simple_config));
-
+void
+readConfiguration(char* filename) 
+{
    say(INFO, "Reading configuration file %s", filename);
 
-   set_defaults(config);
+   set_defaults(g_config);
 
-   wl_list_init(&config->key_bindings);
-   wl_list_init(&config->mouse_bindings);
-   wl_list_init(&config->autostarts);
+   wl_list_init(&g_config->key_bindings);
+   wl_list_init(&g_config->mouse_bindings);
+   wl_list_init(&g_config->autostarts);
 
    FILE *f;
    if(!(f=fopen(filename, "r")))
@@ -94,37 +98,30 @@ struct simple_config * readConfiguration(char* filename) {
       //if(value==NULL) continue;
 
       say(DEBUG, "config id = '%s' / value = '%s'", id, value);
-      if(!strcmp(id, "n_tags")) config->n_tags=atoi(value);
+      if(!strcmp(id, "n_tags")) g_config->n_tags=atoi(value);
       if(!strcmp(id, "tag_names")){
          token = strtok(value, ";");
-         strncpy(config->tag_names[0], token, sizeof config->tag_names[0]);
-         trim(config->tag_names[0]);
-         for(int i=1; i<config->n_tags; i++){
+         strncpy(g_config->tag_names[0], token, sizeof g_config->tag_names[0]);
+         trim(g_config->tag_names[0]);
+         for(int i=1; i<g_config->n_tags; i++){
             token = strtok(NULL, ";");
-            strncpy(config->tag_names[i], token, sizeof config->tag_names[i]);
-            trim(config->tag_names[i]);
+            strncpy(g_config->tag_names[i], token, sizeof g_config->tag_names[i]);
+            trim(g_config->tag_names[i]);
          }
       }
 
-      if(!strcmp(id, "border_width")) config->border_width = atoi(value);
-      if(!strcmp(id, "tile_gap_width")) config->tile_gap_width = atoi(value);
-      if(!strcmp(id, "moveresize_step")) config->moveresize_step = atoi(value);
-      if(!strcmp(id, "sloppy_focus")) config->sloppy_focus = !strcmp(value, "true") ? true : false; 
+      if(!strcmp(id, "border_width"))     g_config->border_width = atoi(value);
+      if(!strcmp(id, "tile_gap_width"))   g_config->tile_gap_width = atoi(value);
+      if(!strcmp(id, "moveresize_step"))  g_config->moveresize_step = atoi(value);
+      if(!strcmp(id, "sloppy_focus"))     g_config->sloppy_focus = !strcmp(value, "true") ? true : false; 
 
-      if(!strcmp(id, "background_colour")) 
-         colour2rgba(value, config->background_colour);
-      if(!strcmp(id, "border_colour_focus")) 
-         colour2rgba(value, config->border_colour[FOCUSED]);
-      if(!strcmp(id, "border_colour_unfocus")) 
-         colour2rgba(value, config->border_colour[UNFOCUSED]);
-      if(!strcmp(id, "border_colour_urgent")) 
-         colour2rgba(value, config->border_colour[URGENT]);
-      if(!strcmp(id, "border_colour_marked")) 
-         colour2rgba(value, config->border_colour[MARKED]);
-      if(!strcmp(id, "border_colour_fixed")) 
-         colour2rgba(value, config->border_colour[FIXED]);
-      if(!strcmp(id, "border_colour_outline")) 
-         colour2rgba(value, config->border_colour[OUTLINE]);
+      if(!strcmp(id, "background_colour"))      colour2rgba(value, g_config->background_colour);
+      if(!strcmp(id, "border_colour_focus"))    colour2rgba(value, g_config->border_colour[FOCUSED]);
+      if(!strcmp(id, "border_colour_unfocus"))  colour2rgba(value, g_config->border_colour[UNFOCUSED]);
+      if(!strcmp(id, "border_colour_urgent"))   colour2rgba(value, g_config->border_colour[URGENT]);
+      if(!strcmp(id, "border_colour_marked"))   colour2rgba(value, g_config->border_colour[MARKED]);
+      if(!strcmp(id, "border_colour_fixed"))    colour2rgba(value, g_config->border_colour[FIXED]);
+      if(!strcmp(id, "border_colour_outline"))  colour2rgba(value, g_config->border_colour[OUTLINE]);
 
       if(!strcmp(id, "KEY")){
          char binding[32];
@@ -173,7 +170,7 @@ struct simple_config * readConfiguration(char* filename) {
          keybind->keyfn = this_fn;
          strncpy(keybind->argument, args, sizeof keybind->argument);
 
-         wl_list_insert(&config->key_bindings, &keybind->link);
+         wl_list_insert(&g_config->key_bindings, &keybind->link);
       }
 
       if(!strcmp(id, "MOUSE")){
@@ -225,15 +222,14 @@ struct simple_config * readConfiguration(char* filename) {
          mousebind->context = this_context;
          strncpy(mousebind->argument, args, sizeof mousebind->argument);
 
-         wl_list_insert(&config->mouse_bindings, &mousebind->link);
+         wl_list_insert(&g_config->mouse_bindings, &mousebind->link);
       }
 
       if(!strcmp(id, "AUTOSTART")){
          struct autostart *autostart = calloc(1, sizeof(struct autostart));
          strncpy(autostart->command, value, sizeof autostart->command);
 
-         wl_list_insert(&config->autostarts, &autostart->link);
+         wl_list_insert(&g_config->autostarts, &autostart->link);
       }
    }
-   return config;
 }

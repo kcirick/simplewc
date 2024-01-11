@@ -1,16 +1,11 @@
 /*
  * main.c
- *   - Main SWC Program
+ *   - Main SimpleWC Program
  */
 
-#include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
-#include <wlr/backend/session.h>
 #include <wlr/util/log.h>
-#if XWAYLAND
-#include <wlr/xwayland.h>
-#endif
 
 #include "globals.h"
 #include "server.h"
@@ -18,8 +13,9 @@
 static const char *msg_str[NMSG] = { "DEBUG", "INFO", "WARNING", "ERROR" };
 static int info_level = WLR_SILENT;
 
-static struct wlr_session *g_session;
+struct wlr_session *g_session;
 struct simple_server* g_server;
+struct simple_config* g_config;
 
 //------------------------------------------------------------------------
 void 
@@ -33,7 +29,7 @@ say(int level, const char* message, ...)
    vsnprintf(buffer, 256, message, args);
    va_end(args);
 
-   printf("SWC [%s]: %s\n", msg_str[level], buffer);
+   printf("SimpleWC [%s]: %s\n", msg_str[level], buffer);
    //wlr_log(WLR_INFO, " [%s]: %s", msg_str[level], buffer);
 
    if(level==ERROR) exit(EXIT_FAILURE);
@@ -103,18 +99,18 @@ main(int argc, char **argv)
          exit(EXIT_SUCCESS);
       }
       else if(!strcmp(iarg, "--help")) {
-         say(INFO, "Usage: swc [--config file][--debug][--version][--help]");
+         say(INFO, "Usage: %s [--config file][--start cmd][--debug][--version][--help]", argv[0]);
          exit(EXIT_SUCCESS);
       }
    }
    if(config_file[0]=='\0')
-      sprintf(config_file, "%s/%s", getenv("HOME"), ".config/swc/configrc");
+      sprintf(config_file, "%s/%s", getenv("HOME"), ".config/simplewc/configrc");
 
    // Wayland requires XDG_RUNTIME_DIR for creating its communications socket
    if(!getenv("XDG_RUNTIME_DIR"))
       say(ERROR, "XDG_RUNTIME_DIR must be set!");
 
-   // handle signals
+   // Handle signals
    int signals[] = { SIGCHLD, SIGINT, SIGTERM, SIGPIPE };
    struct sigaction sa;
    sigemptyset(&sa.sa_mask);
@@ -124,23 +120,22 @@ main(int argc, char **argv)
    for(int i=0; i<LENGTH(signals); i++)
       sigaction(signals[i], &sa, NULL);
 
-   // create a server
+   // Start WLR logging
+   wlr_log_init(info_level, NULL);
+
+   // Read in config
+   if(!(g_config = calloc(1, sizeof(struct simple_config))))
+      say(ERROR, "Cannot allocate g_config");
+   readConfiguration(config_file);
+
+   // Create a server
    if(!(g_server = calloc(1, sizeof(struct simple_server))))
       say(ERROR, "Cannot allocate g_server");
-
-   g_server->config = readConfiguration(config_file);
-
-   prepareServer(g_session, info_level);
+   prepareServer();
    
-   startServer();
+   startServer(start_cmd);
 
-   // Run autostarts and startup comand if defined
-   if(start_cmd[0]!='\0') spawn(start_cmd);
-   struct autostart *autostart;
-   wl_list_for_each(autostart, &g_server->config->autostarts, link) {
-      spawn(autostart->command);
-   }
-
+   // Run the main Wayland event loop
    wl_display_run(g_server->display);
    
    cleanupServer();

@@ -3,7 +3,6 @@
 
 struct simple_layer_surface {
    struct wl_list link;
-   struct simple_server *server;
    struct simple_output *output;
    enum ClientType type;
 

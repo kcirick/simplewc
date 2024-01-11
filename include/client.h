@@ -3,7 +3,6 @@
 
 struct simple_client {
    struct wl_list link;
-   struct simple_server *server;
    struct simple_output *output;
    enum ClientType type;
 
@@ -44,7 +43,7 @@ struct simple_client {
    struct wlr_box geom;
 };
    
-//void toggleClientTag(struct simple_client*, int);
+//--- action calls
 void sendClientToTag(struct simple_client*, int);
 void toggleClientFixed(struct simple_client*);
 void toggleClientVisible(struct simple_client*);
@@ -56,7 +55,7 @@ void maximizeClient(struct simple_client*);
 char * get_client_title(struct simple_client*);
 char * get_client_appid(struct simple_client*);
 struct simple_client* get_top_client_from_output(struct simple_output*, bool);
-int get_client_at(struct simple_server*, double, double, struct simple_client**, struct wlr_surface**, double*, double*);
+int get_client_at(double, double, struct simple_client**, struct wlr_surface**, double*, double*);
 int get_client_from_surface(struct wlr_surface*, struct simple_client**, struct simple_layer_surface**);
 void focus_client(struct simple_client*, bool);
 void begin_interactive(struct simple_client*, enum CursorMode, uint32_t);

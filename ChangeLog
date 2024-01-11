@@ -1,5 +1,9 @@
 TODO
-	* : 
+	* : Resize client borders when the configure is called
+
+2024-01-10
+	* main.c, Makefile: Change the name from SWC to SimpleWC
+	* main.c: Move simple_config out of simple_server struct and make its own global struct
 
 2024-01-09
 	* globals.h: Adjust VISIBLEON() macro to remove client->visible flag

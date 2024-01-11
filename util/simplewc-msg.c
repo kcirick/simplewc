@@ -1,5 +1,5 @@
 /*
- * swc-msg
+ * simplewc-msg
  */
 
 #include <stdio.h>
@@ -57,7 +57,7 @@ say(int level, const char* message, ...)
    vsnprintf(buffer, 256, message, args);
    va_end(args);
 
-   printf("SWC-MSG [%s]: %s", msg_str[level], buffer);
+   printf("SimpleWC-MSG [%s]: %s", msg_str[level], buffer);
 
    if(level==ERROR) exit(EXIT_FAILURE);
 }

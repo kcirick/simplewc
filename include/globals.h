@@ -1,10 +1,12 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <wayland-server-core.h>
+#include <wlr/backend/session.h>
 #include <xkbcommon/xkbcommon.h>
 
 #define MAX_TAGS 9
@@ -83,9 +85,11 @@ struct autostart {
 
 //--- global variables -----
 extern struct simple_server* g_server;
+extern struct wlr_session* g_session;
+extern struct simple_config* g_config;
 
 //--- functions in config.c -----
-struct simple_config * readConfiguration(char*);
+void readConfiguration(char*);
 
 //--- functions in main.c -----
 void say(int, const char*, ...);

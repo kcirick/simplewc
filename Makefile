@@ -1,5 +1,5 @@
 VERSION = 0.2
-TARGET  = swc 
+TARGET  = simplewc 
 
 CC = gcc
 MY_CFLAGS = $(CFLAGS) -g -Wall -DVERSION=\"$(VERSION)\" \
@@ -27,7 +27,7 @@ CPURPLE  = "\\033[35m"
 CRESET   = "\\033[0m"
 
 #-------------------------------------------------------------------------
-all: objdir $(TARGET) swc-msg 
+all: objdir $(TARGET) simplewc-msg 
 
 include/wlr-output-power-management-unstable-v1-protocol.h:
 	@echo " [ $(CGREEN)WL$(CRESET) ] Creating $@"
@@ -74,15 +74,15 @@ $(TARGET): $(OBJECTS)
 	@echo " [ $(CPURPLE)BIN$(CRESET) ] $(TARGET)"
 	@$(CC) -o $@ $(OBJECTS) $(MY_LFLAGS)
 
-swc-msg: util/swc-msg.c util/dwl-ipc-unstable-v2-protocol.h util/dwl-ipc-unstable-v2-protocol.c
+simplewc-msg: util/simplewc-msg.c util/dwl-ipc-unstable-v2-protocol.h util/dwl-ipc-unstable-v2-protocol.c
 	@echo " [ $(CPURPLE)BIN$(CRESET) ] $@"
 	@$(CC) -o $@ $^ -Iinclude -lwayland-client
 
 clean:
 	@echo " [ $(CRED)RM$(CRESET) ] $(TARGET)"
 	@rm -f $(TARGET)
-	@echo " [ $(CRED)RM$(CRESET) ] swc-msg"
-	@rm -f swc-msg
+	@echo " [ $(CRED)RM$(CRESET) ] simplewc-msg"
+	@rm -f simplewc-msg
 	@echo " [ $(CRED)RM$(CRESET) ] $(OBJECTS)"
 	@rm -f $(OBJECTS)
 	@echo " [ $(CRED)RM$(CRESET) ] wlr-layer-shell-unstable-v1-protocol.h xdg-shell-protocol.h wlr-output-power-manangement-unstable-v1-protocol.h"

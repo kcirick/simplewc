@@ -20,11 +20,11 @@ key_function(struct simple_server *server, struct keymap *keymap)
 
    //--- TAG -----
    if(keymap->keyfn==TAG){
-      if(!strcmp(keymap->argument, "prev"))     setCurrentTag(server, /*curtag*/-1, false);
-      if(!strcmp(keymap->argument, "next"))     setCurrentTag(server, /*curtag*/+1, false);
-      if(!strcmp(keymap->argument, "select"))   setCurrentTag(server, keymap->keysym-XKB_KEY_1, false);
-      if(!strcmp(keymap->argument, "toggle"))   setCurrentTag(server, keymap->keysym-XKB_KEY_1, true);
-      if(!strcmp(keymap->argument, "tile"))     tileTag(server);
+      if(!strcmp(keymap->argument, "prev"))     setCurrentTag(/*curtag*/-1, false);
+      if(!strcmp(keymap->argument, "next"))     setCurrentTag(/*curtag*/+1, false);
+      if(!strcmp(keymap->argument, "select"))   setCurrentTag(keymap->keysym-XKB_KEY_1, false);
+      if(!strcmp(keymap->argument, "toggle"))   setCurrentTag(keymap->keysym-XKB_KEY_1, true);
+      if(!strcmp(keymap->argument, "tile"))     tileTag();
 
       arrange_output(server->cur_output);
    }
@@ -34,7 +34,6 @@ key_function(struct simple_server *server, struct keymap *keymap)
    struct simple_client* client;
    int type = get_client_from_surface(surface, &client, NULL);
 
-   say(DEBUG, "type = %d", type);
    if(keymap->keyfn==CLIENT) {
       if(!strcmp(keymap->argument, "cycle"))          cycleClients(server->cur_output);
 
@@ -47,17 +46,17 @@ key_function(struct simple_server *server, struct keymap *keymap)
       if(!strcmp(keymap->argument, "tile_left"))      tileClient(client, LEFT);
       if(!strcmp(keymap->argument, "tile_right"))     tileClient(client, RIGHT);
       if(!strcmp(keymap->argument, "move")){
-         if(keymap->keysym==XKB_KEY_Left)    client->geom.x-=server->config->moveresize_step;
-         if(keymap->keysym==XKB_KEY_Right)   client->geom.x+=server->config->moveresize_step;
-         if(keymap->keysym==XKB_KEY_Up)      client->geom.y-=server->config->moveresize_step;
-         if(keymap->keysym==XKB_KEY_Down)    client->geom.y+=server->config->moveresize_step;
+         if(keymap->keysym==XKB_KEY_Left)    client->geom.x-=g_config->moveresize_step;
+         if(keymap->keysym==XKB_KEY_Right)   client->geom.x+=g_config->moveresize_step;
+         if(keymap->keysym==XKB_KEY_Up)      client->geom.y-=g_config->moveresize_step;
+         if(keymap->keysym==XKB_KEY_Down)    client->geom.y+=g_config->moveresize_step;
          set_client_geometry(client, client->geom);
       }
       if(!strcmp(keymap->argument, "resize")){
-         if(keymap->keysym==XKB_KEY_Left)    client->geom.width-=server->config->moveresize_step;
-         if(keymap->keysym==XKB_KEY_Right)   client->geom.width+=server->config->moveresize_step;
-         if(keymap->keysym==XKB_KEY_Up)      client->geom.height-=server->config->moveresize_step;
-         if(keymap->keysym==XKB_KEY_Down)    client->geom.height+=server->config->moveresize_step;
+         if(keymap->keysym==XKB_KEY_Left)    client->geom.width-=g_config->moveresize_step;
+         if(keymap->keysym==XKB_KEY_Right)   client->geom.width+=g_config->moveresize_step;
+         if(keymap->keysym==XKB_KEY_Up)      client->geom.height-=g_config->moveresize_step;
+         if(keymap->keysym==XKB_KEY_Down)    client->geom.height+=g_config->moveresize_step;
          set_client_geometry(client, client->geom);
       }
       // ...
@@ -68,7 +67,6 @@ key_function(struct simple_server *server, struct keymap *keymap)
 void 
 mouse_function(struct simple_client *client, struct mousemap *mousemap, int resize_edges)
 {
-   say(DEBUG, "mouse_function");
    if(mousemap->context==CONTEXT_ROOT){
       if(!strcmp(mousemap->argument, "test"))   say(INFO, "test()");
    }

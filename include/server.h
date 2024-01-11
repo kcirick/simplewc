@@ -9,8 +9,6 @@
 struct simple_server {
    struct wl_display *display;
 
-   struct simple_config *config;
-
    struct wlr_backend *backend;
    struct wlr_renderer *renderer;
    struct wlr_allocator *allocator;
@@ -20,6 +18,7 @@ struct simple_server {
    struct wlr_scene_tree *layer_tree[NLayers];
    struct wlr_scene_output_layout *scene_output_layout;
 
+   // output and decoration manager
    struct wl_list outputs;
    struct simple_output* cur_output;
    struct wlr_output_layout *output_layout;
@@ -33,6 +32,7 @@ struct simple_server {
    struct wlr_xdg_decoration_manager_v1 *xdg_decoration_manager;
    struct wl_listener new_decoration;
 
+   // clients and layers
    struct wl_list clients;
    struct wlr_xdg_shell *xdg_shell;
    struct wl_listener xdg_new_surface;
@@ -46,8 +46,7 @@ struct simple_server {
    struct wlr_layer_shell_v1 *layer_shell;
    struct wl_listener layer_new_surface;
 
-   struct wl_list focus_order;
-
+   // seat and input
    struct wlr_seat *seat;
 
    struct wl_list inputs;   
@@ -71,10 +70,10 @@ struct simple_server {
    struct wl_listener start_drag;
    struct wl_listener destroy_drag_icon;
 
+   // input method
    struct simple_input_method_relay *im_relay;
    struct wlr_text_input_manager_v3 *text_input;
    struct wlr_input_method_manager_v2 *input_method;
-
 
    // session idle notifier
    struct wlr_idle_notifier_v1 *idle_notifier;
@@ -108,7 +107,6 @@ struct simple_server {
 
 struct simple_output {
    struct wl_list link;
-   struct simple_server *server;
    struct wlr_output *wlr_output;
 
    struct wl_list layer_shells[N_LAYER_SHELL_LAYERS];
@@ -154,12 +152,12 @@ struct client_outline* client_outline_create(struct wlr_scene_tree*, float*, int
 void client_outline_set_size(struct client_outline*, int, int);
 
 void print_server_info();
-void setCurrentTag(struct simple_server*, int, bool);
-void tileTag(struct simple_server*);
+void setCurrentTag(int, bool);
+void tileTag();
 void arrange_output(struct simple_output*);
 
-void prepareServer(struct wlr_session*, int);
-void startServer();
+void prepareServer();
+void startServer(char*);
 void cleanupServer();
 
 #endif

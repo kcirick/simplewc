@@ -1,6 +1,6 @@
-#include <unistd.h>
 #include <assert.h>
 #include <signal.h>
+#include <string.h>
 #include <wlr/backend.h>
 #include <wlr/backend/session.h>
 #include <wlr/render/allocator.h>
@@ -11,7 +11,6 @@
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
-#include <wlr/types/wlr_matrix.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_output_management_v1.h>
@@ -39,8 +38,6 @@
 //#include <wlr/types/wlr_text_input_v3.h>
 //#include <wlr/types/wlr_foreign_toplevel_management_v1.h>
 
-#include <wlr/util/log.h>
-
 #include "dwl-ipc-unstable-v2-protocol.h"
 #include "globals.h"
 #include "layer.h"
@@ -48,7 +45,6 @@
 #include "server.h"
 #include "input.h"
 #include "ipc.h"
-
 
 //--- client outline procedures ------------------------------------------
 static void
@@ -96,10 +92,9 @@ client_outline_set_size(struct client_outline* outline, int width, int height) {
 
 //------------------------------------------------------------------------
 void
-setCurrentTag(struct simple_server* server, int tag, bool toggle)
+setCurrentTag(int tag, bool toggle)
 {
-   say(DEBUG, "setCurrentTag %d", tag);
-   struct simple_output* output = server->cur_output;
+   struct simple_output* output = g_server->cur_output;
    if(toggle)
       output->visible_tags ^= TAGMASK(tag);
    else 
@@ -110,24 +105,24 @@ setCurrentTag(struct simple_server* server, int tag, bool toggle)
 }
 
 void
-tileTag(struct simple_server* server) 
+tileTag() 
 {
    struct simple_client* client;
-   struct simple_output* output = server->cur_output;
+   struct simple_output* output = g_server->cur_output;
    
    // first count the number of clients
    int n=0;
-   wl_list_for_each(client, &server->clients, link){
+   wl_list_for_each(client, &g_server->clients, link){
       if(!(client->visible && VISIBLEON(client, output))) continue;
       n++;
    }
 
-   int gap_width = server->config->tile_gap_width;
-   int bw = server->config->border_width;
+   int gap_width = g_config->tile_gap_width;
+   int bw = g_config->border_width;
 
    int i=0;
    struct wlr_box new_geom;
-   wl_list_for_each(client, &server->clients, link){
+   wl_list_for_each(client, &g_server->clients, link){
       if(!(client->visible && VISIBLEON(client, output))) continue;
       
       if(i==0) { // master window
@@ -218,7 +213,6 @@ arrange_output(struct simple_output* output)
    check_idle_inhibitor();
 }
 
-
 //--- Other notify functions ---------------------------------------------
 static void
 new_decoration_notify(struct wl_listener *listener, void *data)
@@ -285,9 +279,9 @@ lock_surface_destroy_notify(struct wl_listener *listener, void *data)
 
    if(g_server->locked && g_server->cur_lock && !wl_list_empty(&g_server->cur_lock->surfaces)){
       struct wlr_session_lock_surface_v1 *surface = wl_container_of(g_server->cur_lock->surfaces.next, surface, link);
-      input_focus_surface(g_server, surface->surface);
+      input_focus_surface(surface->surface);
    } else if(!(g_server->locked)){
-      //focus_client();
+      focus_client(get_top_client_from_output(output, false), true);
    } else {
       wlr_seat_keyboard_clear_focus(g_server->seat);
    }
@@ -310,7 +304,7 @@ new_lock_surface_notify(struct wl_listener *listener, void *data)
    LISTEN(&lock_surface->events.destroy, &output->lock_surface_destroy, lock_surface_destroy_notify);
    
    if(output == g_server->cur_output)
-      input_focus_surface(g_server, lock_surface->surface);
+      input_focus_surface(lock_surface->surface);
 }
 
 static void
@@ -319,7 +313,6 @@ unlock_session_notify(struct wl_listener *listener, void *data)
    say(DEBUG, "unlock_session_notify");
    struct simple_session_lock *slock = wl_container_of(listener, slock, unlock);
    
-   //destroylock(lock, 1);
    g_server->locked = false;
    wlr_seat_keyboard_notify_clear_focus(g_server->seat);
 
@@ -365,7 +358,6 @@ new_lock_session_manager_notify(struct wl_listener *listener, void *data)
       return;
    }
 
-   //focusclient(NULL, 0);
    struct simple_session_lock *slock = calloc(1, sizeof(struct simple_session_lock));
    slock->scene = wlr_scene_tree_create(g_server->layer_tree[LyrLock]);
    g_server->cur_lock = slock->lock = session_lock;
@@ -384,7 +376,6 @@ static void
 output_layout_change_notify(struct wl_listener *listener, void *data) 
 {
    say(DEBUG, "output_layout_change_notify");
-   struct simple_server *server = wl_container_of(listener, server, output_layout_change);
 
    struct wlr_output_configuration_v1 *config = wlr_output_configuration_v1_create();
    struct wlr_output_configuration_head_v1 *config_head;
@@ -392,7 +383,7 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
       say(ERROR, "wlr_output_configuration_v1_create failed");
 
    struct simple_output *output;
-   wl_list_for_each(output, &server->outputs, link) {
+   wl_list_for_each(output, &g_server->outputs, link) {
       if(!output->wlr_output->enabled) continue;
 
       config_head = wlr_output_configuration_head_v1_create(config, output->wlr_output);
@@ -401,7 +392,7 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
          say(ERROR, "wlr_output_configuration_head_v1_create failed");
       }
       struct wlr_box box;
-      wlr_output_layout_get_box(server->output_layout, output->wlr_output, &box);
+      wlr_output_layout_get_box(g_server->output_layout, output->wlr_output, &box);
       if(wlr_box_empty(&box))
          say(ERROR, "Failed to get output layout box");
 
@@ -413,7 +404,7 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
    }
 
    if(config)
-      wlr_output_manager_v1_set_configuration(server->output_manager, config);
+      wlr_output_manager_v1_set_configuration(g_server->output_manager, config);
    else
       say(ERROR, "wlr_output_manager_v1_set_configuration failed");
 }
@@ -437,8 +428,7 @@ output_frame_notify(struct wl_listener *listener, void *data)
 {
    //say(DEBUG, "output_frame_notify");
    struct simple_output *output = wl_container_of(listener, output, frame);
-   struct wlr_scene *scene = output->server->scene;
-   struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(scene, output->wlr_output);
+   struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(g_server->scene, output->wlr_output);
    
    // Render the scene if needed and commit the output 
    wlr_scene_output_commit(scene_output, NULL);
@@ -481,7 +471,6 @@ new_output_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "new_output_notify");
    
-   struct simple_server *server = wl_container_of(listener, server, new_output);
    struct wlr_output *wlr_output = data;
 
    // Don't configure any non-desktop displays, such as VR headsets
@@ -492,7 +481,7 @@ new_output_notify(struct wl_listener *listener, void *data)
 
    // Configures the output created by the backend to use the allocator and renderer
    // Must be done once, before committing the output
-   if(!wlr_output_init_render(wlr_output, server->allocator, server->renderer))
+   if(!wlr_output_init_render(wlr_output, g_server->allocator, g_server->renderer))
       say(ERROR, "unable to initialize output renderer");
    
    // The output may be disabled. Switch it on
@@ -510,7 +499,6 @@ new_output_notify(struct wl_listener *listener, void *data)
    struct simple_output *output = calloc(1, sizeof(struct simple_output));
    output->wlr_output = wlr_output;
    wlr_output->data = output;
-   output->server = server;
 
    wl_list_init(&output->ipc_outputs);   // ipc addition
 
@@ -518,42 +506,40 @@ new_output_notify(struct wl_listener *listener, void *data)
    LISTEN(&wlr_output->events.destroy, &output->destroy, output_destroy_notify);
    LISTEN(&wlr_output->events.request_state, &output->request_state, output_request_state_notify);
 
-   wl_list_insert(&server->outputs, &output->link);
-   
+   wl_list_insert(&g_server->outputs, &output->link);
 
    for(int i=0; i<N_LAYER_SHELL_LAYERS; i++)
       wl_list_init(&output->layer_shells[i]);
    
-   wlr_scene_node_lower_to_bottom(&server->layer_tree[LyrBottom]->node);
-   wlr_scene_node_lower_to_bottom(&server->layer_tree[LyrBg]->node);
-   wlr_scene_node_raise_to_top(&server->layer_tree[LyrTop]->node);
-   wlr_scene_node_raise_to_top(&server->layer_tree[LyrOverlay]->node);
-   wlr_scene_node_raise_to_top(&server->layer_tree[LyrLock]->node);
+   wlr_scene_node_lower_to_bottom(&g_server->layer_tree[LyrBottom]->node);
+   wlr_scene_node_lower_to_bottom(&g_server->layer_tree[LyrBg]->node);
+   wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrTop]->node);
+   wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrOverlay]->node);
+   wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrLock]->node);
 
    //set default tag
    output->current_tag = TAGMASK(0);
    output->visible_tags = TAGMASK(0);
 
    struct wlr_output_layout_output *l_output =
-      wlr_output_layout_add_auto(server->output_layout, wlr_output);
+      wlr_output_layout_add_auto(g_server->output_layout, wlr_output);
    struct wlr_scene_output *scene_output =
-      wlr_scene_output_create(server->scene, wlr_output);
-   wlr_scene_output_layout_add_output(server->scene_output_layout, l_output, scene_output);
+      wlr_scene_output_create(g_server->scene, wlr_output);
+   wlr_scene_output_layout_add_output(g_server->scene_output_layout, l_output, scene_output);
 
    // update background and lock geometry
    struct wlr_box geom;
-   wlr_output_layout_get_box(server->output_layout, NULL, &geom);
+   wlr_output_layout_get_box(g_server->output_layout, NULL, &geom);
 
    memset(&output->full_area, 0, sizeof(output->full_area));
    output->full_area = geom;
    
-   wlr_scene_node_set_position(&server->root_bg->node, geom.x, geom.y);
-   wlr_scene_rect_set_size(server->root_bg, geom.width, geom.height);
-   wlr_scene_node_set_position(&server->locked_bg->node, geom.x, geom.y);
-   wlr_scene_rect_set_size(server->locked_bg, geom.width, geom.height);
+   wlr_scene_node_set_position(&g_server->root_bg->node, geom.x, geom.y);
+   wlr_scene_rect_set_size(g_server->root_bg, geom.width, geom.height);
+   wlr_scene_node_set_position(&g_server->locked_bg->node, geom.x, geom.y);
+   wlr_scene_rect_set_size(g_server->locked_bg, geom.width, geom.height);
 
-   wlr_scene_node_set_enabled(&server->root_bg->node, 1);
-   //
+   wlr_scene_node_set_enabled(&g_server->root_bg->node, 1);
 
    say(INFO, " -> Output %s : %dx%d+%d+%d", l_output->output->name,
          l_output->output->width, l_output->output->height, 
@@ -562,16 +548,14 @@ new_output_notify(struct wl_listener *listener, void *data)
 
 //------------------------------------------------------------------------
 void 
-prepareServer(struct wlr_session *session, int info_level) 
+prepareServer() 
 {
    say(INFO, "Preparing Wayland server");
    
-   wlr_log_init(info_level, NULL);
-
    if(!(g_server->display = wl_display_create()))
       say(ERROR, "Unable to create Wayland display!");
 
-   if(!(g_server->backend = wlr_backend_autocreate(g_server->display, &session)))
+   if(!(g_server->backend = wlr_backend_autocreate(g_server->display, &g_session)))
       say(ERROR, "Unable to create wlr_backend!");
 
    // create a scene graph used to lay out windows
@@ -632,11 +616,10 @@ prepareServer(struct wlr_session *session, int info_level)
    if(!g_server->seat)
       say(ERROR, "cannot allocate seat");
 
-   input_init(g_server);
+   input_init();
 
-   // set up Wayland shells, i.e. XDG and XWayland
+   // set up Wayland shells, i.e. XDG, layer shell and XWayland
    wl_list_init(&g_server->clients);
-   wl_list_init(&g_server->focus_order);
    
    if(!(g_server->xdg_shell = wlr_xdg_shell_create(g_server->display, XDG_SHELL_VERSION)))
       say(ERROR, "unable to create XDG shell interface");
@@ -664,7 +647,7 @@ prepareServer(struct wlr_session *session, int info_level)
    wlr_scene_node_set_enabled(&g_server->locked_bg->node, 0);
 
    // set initial background - will be updated when output is changed
-   g_server->root_bg = wlr_scene_rect_create(g_server->layer_tree[LyrBg], 1, 1, g_server->config->background_colour);
+   g_server->root_bg = wlr_scene_rect_create(g_server->layer_tree[LyrBg], 1, 1, g_config->background_colour);
    wlr_scene_node_set_enabled(&g_server->root_bg->node, 0);
 
    // Use decoration protocols to negotiate server-side decorations
@@ -676,6 +659,7 @@ prepareServer(struct wlr_session *session, int info_level)
    struct wlr_presentation *presentation = wlr_presentation_create(g_server->display, g_server->backend);
    wlr_scene_set_presentation(g_server->scene, presentation);
 
+   // Set up IPC interface
    wl_global_create(g_server->display, &zdwl_ipc_manager_v2_interface, DWL_IPC_VERSION, NULL, ipc_manager_bind);
 
 #if XWAYLAND
@@ -690,7 +674,7 @@ prepareServer(struct wlr_session *session, int info_level)
 }
 
 void 
-startServer() 
+startServer(char* start_cmd) 
 {
    say(INFO, "Starting Wayland server");
 
@@ -718,7 +702,11 @@ startServer()
    // choose initial output based on cursor position
    g_server->cur_output = get_output_at(g_server->cursor->x, g_server->cursor->y);
 
-   print_server_info();
+   // Run autostarts and startup comand if defined
+   if(start_cmd[0]!='\0') spawn(start_cmd);
+   struct autostart *autostart;
+   wl_list_for_each(autostart, &g_config->autostarts, link)
+      spawn(autostart->command);
 }
 
 void 

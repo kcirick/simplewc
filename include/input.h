@@ -3,7 +3,6 @@
 
 struct simple_input {
    struct wl_list link;
-   struct simple_server *server;
    struct wlr_input_device *device;
    struct wlr_keyboard *keyboard;
 
@@ -13,7 +12,8 @@ struct simple_input {
    struct wl_listener destroy;
 };
 
-void input_init(struct simple_server*);
-void input_focus_surface(struct simple_server*, struct wlr_surface*);
+void input_focus_surface(struct wlr_surface*);
+
+void input_init();
 
 #endif

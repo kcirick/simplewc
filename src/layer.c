@@ -11,7 +11,6 @@
 #include "client.h"
 #include "server.h"
 
-//map from ZWLR_LAYER_SHELL_* constants to LayerType enum
 static const int layermap[] = {LyrBg, LyrBottom, LyrTop, LyrOverlay };
 
 void 
@@ -44,8 +43,7 @@ arrange_layers(struct simple_output *output)
 
    //apply_override(output, &usable_area);
 
-   struct simple_server *server = output->server;
-   struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server->scene, output->wlr_output);
+   struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(g_server->scene, output->wlr_output);
    if(!scene_output){
       say(DEBUG, "no wlr_scene_output");
       return;
@@ -67,14 +65,6 @@ arrange_layers(struct simple_output *output)
       // set node position to account for output layout change
       //wlr_scene_node_set_position(&server->layer_tree[i]->node, scene_output->x, scene_output->y);
    }
-
-   /*
-   struct simple_layer_surface *lsurface;
-   wl_list_for_each_reverse(lsurface, &output->layers[ZWLR_LAYER_SHELL_V1_LAYER_TOP], link){
-      say(DEBUG, "Present");
-      input_focus_surface(server, lsurface->scene_layer_surface->layer_surface->surface);
-      
-   }*/
 }
 
 //--- Notify functions ---------------------------------------------------
@@ -96,12 +86,11 @@ layer_surface_unmap_notify(struct wl_listener *listener, void *data)
 
    lsurface->mapped = 0;
    wlr_scene_node_set_enabled(&lsurface->scene_tree->node, 0);
-   //if(lsurface == exclusive_focus)
-   //   exclusive_focus=NULL;
+
    if(wlr_lsurface->output && (lsurface->output = wlr_lsurface->output->data))
       arrange_layers(lsurface->output);
-   if(wlr_lsurface->surface == lsurface->server->seat->keyboard_state.focused_surface)
-      focus_client(get_top_client_from_output(lsurface->server->cur_output, false), false);
+   if(wlr_lsurface->surface == g_server->seat->keyboard_state.focused_surface)
+      focus_client(get_top_client_from_output(g_server->cur_output, false), false);
 }
 
 static void 
@@ -112,7 +101,7 @@ layer_surface_commit_notify(struct wl_listener *listener, void *data)
    struct simple_layer_surface *lsurface = wl_container_of(listener, lsurface, surface_commit);
    struct wlr_layer_surface_v1 *wlr_lsurface = lsurface->scene_layer_surface->layer_surface;
    struct wlr_output *wlr_output = wlr_lsurface->output;
-   struct wlr_scene_tree *layer = lsurface->server->layer_tree[layermap[wlr_lsurface->current.layer]];
+   struct wlr_scene_tree *layer = g_server->layer_tree[layermap[wlr_lsurface->current.layer]];
 
    // For some reason this surface has no output, its monitor has just been destroyed
    if(!wlr_output || !(lsurface->output = wlr_output->data))
@@ -124,9 +113,6 @@ layer_surface_commit_notify(struct wl_listener *listener, void *data)
       wl_list_remove(&lsurface->link);
       wl_list_insert(&lsurface->output->layer_shells[wlr_lsurface->current.layer], &lsurface->link);
    }
-   //if (wlr_lsurface->current.layer <= ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM){
-   //   wlr_scene_node_reparent(&lsurface->popups->node, lsurface->server->layer_tree[LyrTop]);
-   //}
 
    if(wlr_lsurface->current.committed==0 && lsurface->mapped == wlr_lsurface->surface->mapped)
       return;
@@ -156,20 +142,18 @@ void
 layer_new_surface_notify(struct wl_listener *listener, void *data) 
 {
    say(DEBUG, "layer_new_surface_notify");
-   struct simple_server *server = wl_container_of(listener, server, layer_new_surface);
    struct wlr_layer_surface_v1 *layer_surface = data;
 
    if(!layer_surface->output) {
       layer_surface->output = wlr_output_layout_output_at(
-            server->output_layout, server->cursor->x, server->cursor->y);
+            g_server->output_layout, g_server->cursor->x, g_server->cursor->y);
    }
 
    struct simple_output *output = layer_surface->output->data;
-   struct wlr_scene_tree *selected_layer = server->layer_tree[layermap[layer_surface->pending.layer]];
+   struct wlr_scene_tree *selected_layer = g_server->layer_tree[layermap[layer_surface->pending.layer]];
 
    struct simple_layer_surface *lsurface = calloc(1, sizeof(struct simple_layer_surface));
    lsurface->type = LAYER_SHELL_CLIENT;
-   lsurface->server = server;
    lsurface->output = output;
 
    lsurface->scene_layer_surface = wlr_scene_layer_surface_v1_create(selected_layer, layer_surface);

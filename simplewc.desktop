@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=SWC
+Name=SimpleWC
 Comment=Simple Wayland Compositor
-Exec=/usr/local/bin/swc
+Exec=/usr/local/bin/simplewc
 Type=Application
