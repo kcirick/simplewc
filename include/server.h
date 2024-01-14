@@ -40,6 +40,8 @@ struct simple_server {
    struct wlr_xwayland *xwayland;
    struct wl_listener xwl_new_surface;
    struct wl_listener xwl_ready;
+
+   xcb_atom_t netatom[NetLast];
 #endif
 
    struct wl_list layer_shells;
@@ -93,10 +95,12 @@ struct simple_server {
    struct wlr_output_power_manager_v1 *output_power_manager;
    struct wl_listener output_pm_set_mode;
 
+   // gamma control manager
+   struct wlr_gamma_control_manager_v1 *gamma_control_manager;
+   struct wl_listener set_gamma;
+
    // background layer
    struct wlr_scene_rect *root_bg;
-
-   xcb_atom_t netatom[NetLast];
 
    struct simple_client *grabbed_client;
    struct client_outline *grabbed_client_outline;
@@ -125,6 +129,8 @@ struct simple_output {
 
    struct wlr_box full_area;
    struct wlr_box usable_area;
+
+   bool gamma_lut_changed;
 };
 
 struct client_outline {

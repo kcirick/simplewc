@@ -1,4 +1,4 @@
-# SimpleWC Config
+# Sample SimpleWC Config
 
 n_tags = 3
 
@@ -15,12 +15,16 @@ border_colour_urgent = #FF0000
 border_colour_fixed = #0000FF
 border_colour_outline = #FFFFFF
 
+#--- Command for locking -----
+lock_cmd = swaylock -c 000000
+
 #--- Autostarts (in sequence -----
 #AUTOSTART = swayidle -w timeout 900 'swaylock -c 000000'
 #AUTOSTART = waybar
 
 #--- Key Bindings -----
 KEY = A+q QUIT 0
+KEY = A+l LOCK lock_cmd 
 KEY = S+A+Return SPAWN foot
 #--- Client actions
 KEY = A+Tab CLIENT cycle

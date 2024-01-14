@@ -28,6 +28,8 @@ Usage:
 
 `> simplewc-msg (--get | --watch) [--output][--tag][--client (title | appid)]`
 
+`> simplewc-msg --action (quit | lock)`
+
 
 ## Status
 Please use [Github Issues Tracker][ghit] to report bugs and issues.
@@ -51,8 +53,11 @@ v0.1
     - Added visibility toggle (a.k.a. iconify) and maximize functionality
     - Added support for wlr_idle_notifier_v1, wlr_idle_inhibit_v1, and wlr_session_lock_manager_v1 (e.g. swaylock)
     - Added support for wlr_output_power_management_v1 (e.g. wlopm)
+    - Added support for wlr_gamma_control_manager_v1
+    - Added feature to send action via simplewc-msg
     - Added support for dragging icons
     - Improve client cycling function
+    - See ChangeLog for fixed bugs
   - 0.1 (2023-12-23) ([download][v01])
     - Goal: get the base code in working order
     - Uses wlroots v0.17

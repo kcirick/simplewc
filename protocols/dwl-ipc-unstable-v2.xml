@@ -58,6 +58,11 @@ I would probably just submit raphi's patchset but I don't think that would be po
       </description>
       <arg name="name" type="string"/>
     </event>
+    <!-- simplewc additions -->
+    <request name="send_action">
+      <description summary="Send action calls"/>
+      <arg name="action" type="string" summary="Action to perform"/>
+    </request>
   </interface>
 
   <interface name="zdwl_ipc_output_v2" version="2">

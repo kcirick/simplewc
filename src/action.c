@@ -10,10 +10,13 @@
 #include "server.h"
 
 void 
-key_function(struct simple_server *server, struct keymap *keymap) 
+key_function(struct keymap *keymap) 
 {
    //--- QUIT -----
-   if(keymap->keyfn==QUIT)    wl_display_terminate(server->display);
+   if(keymap->keyfn==QUIT)    wl_display_terminate(g_server->display);
+   
+   //--- LOCK -----
+   if(keymap->keyfn==LOCK)    spawn(g_config->lock_cmd);
 
    //--- SPAWN -----
    if(keymap->keyfn==SPAWN)   spawn(keymap->argument);
@@ -26,16 +29,16 @@ key_function(struct simple_server *server, struct keymap *keymap)
       if(!strcmp(keymap->argument, "toggle"))   setCurrentTag(keymap->keysym-XKB_KEY_1, true);
       if(!strcmp(keymap->argument, "tile"))     tileTag();
 
-      arrange_output(server->cur_output);
+      arrange_output(g_server->cur_output);
    }
 
    //--- CLIENT -----
-   struct wlr_surface *surface = server->seat->keyboard_state.focused_surface;
+   struct wlr_surface *surface = g_server->seat->keyboard_state.focused_surface;
    struct simple_client* client;
    int type = get_client_from_surface(surface, &client, NULL);
 
    if(keymap->keyfn==CLIENT) {
-      if(!strcmp(keymap->argument, "cycle"))          cycleClients(server->cur_output);
+      if(!strcmp(keymap->argument, "cycle"))          cycleClients(g_server->cur_output);
 
       if(type<0) return;
       if(!strcmp(keymap->argument, "send_to_tag"))    sendClientToTag(client, keymap->keysym-XKB_KEY_1);
@@ -50,17 +53,17 @@ key_function(struct simple_server *server, struct keymap *keymap)
          if(keymap->keysym==XKB_KEY_Right)   client->geom.x+=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Up)      client->geom.y-=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Down)    client->geom.y+=g_config->moveresize_step;
-         set_client_geometry(client, client->geom);
+         set_client_geometry(client, false);
       }
       if(!strcmp(keymap->argument, "resize")){
          if(keymap->keysym==XKB_KEY_Left)    client->geom.width-=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Right)   client->geom.width+=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Up)      client->geom.height-=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Down)    client->geom.height+=g_config->moveresize_step;
-         set_client_geometry(client, client->geom);
+         set_client_geometry(client, false);
       }
       // ...
-      arrange_output(server->cur_output);
+      arrange_output(g_server->cur_output);
    }
 }
 
@@ -76,3 +79,12 @@ mouse_function(struct simple_client *client, struct mousemap *mousemap, int resi
       if(!strcmp(mousemap->argument, "resize")) begin_interactive(client, CURSOR_RESIZE, resize_edges);
    }
 }
+
+void
+process_ipc_action(const char* action)
+{
+   if(!strcmp(action, "test"))   say(INFO, "Action test");
+   if(!strcmp(action, "quit"))   wl_display_terminate(g_server->display);
+   if(!strcmp(action, "lock"))   spawn(g_config->lock_cmd);
+}
+

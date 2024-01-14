@@ -49,20 +49,20 @@ trim(char *orig)
 
 //------------------------------------------------------------------------
 void 
-set_defaults(struct simple_config *config)
+set_defaults()
 {
-   config->n_tags = 4;
-   config->border_width = 2;
-   config->sloppy_focus = false;
-   config->moveresize_step = 10;
+   g_config->n_tags = 4;
+   g_config->border_width = 2;
+   g_config->sloppy_focus = false;
+   g_config->moveresize_step = 10;
 
-   colour2rgba("#111111", config->background_colour);
-   colour2rgba("#0000FF", config->border_colour[FOCUSED]);
-   colour2rgba("#CCCCCC", config->border_colour[UNFOCUSED]);
-   colour2rgba("#FF0000", config->border_colour[URGENT]);
-   colour2rgba("#00FF00", config->border_colour[MARKED]);
-   colour2rgba("#0000FF", config->border_colour[FIXED]);
-   colour2rgba("#FFFFFF", config->border_colour[OUTLINE]);
+   colour2rgba("#111111", g_config->background_colour);
+   colour2rgba("#0000FF", g_config->border_colour[FOCUSED]);
+   colour2rgba("#CCCCCC", g_config->border_colour[UNFOCUSED]);
+   colour2rgba("#FF0000", g_config->border_colour[URGENT]);
+   colour2rgba("#00FF00", g_config->border_colour[MARKED]);
+   colour2rgba("#0000FF", g_config->border_colour[FIXED]);
+   colour2rgba("#FFFFFF", g_config->border_colour[OUTLINE]);
 }
 
 void
@@ -70,7 +70,7 @@ readConfiguration(char* filename)
 {
    say(INFO, "Reading configuration file %s", filename);
 
-   set_defaults(g_config);
+   set_defaults();
 
    wl_list_init(&g_config->key_bindings);
    wl_list_init(&g_config->mouse_bindings);
@@ -123,6 +123,8 @@ readConfiguration(char* filename)
       if(!strcmp(id, "border_colour_fixed"))    colour2rgba(value, g_config->border_colour[FIXED]);
       if(!strcmp(id, "border_colour_outline"))  colour2rgba(value, g_config->border_colour[OUTLINE]);
 
+      if(!strcmp(id, "lock_cmd"))      strncpy(g_config->lock_cmd, value, sizeof g_config->lock_cmd);;
+
       if(!strcmp(id, "KEY")){
          char binding[32];
          token = strtok(value, " ");
@@ -160,6 +162,7 @@ readConfiguration(char* filename)
 
          int this_fn = -1;
               if(!strcmp(function, "QUIT"))     this_fn = QUIT;
+         else if(!strcmp(function, "LOCK"))     this_fn = LOCK;
          else if(!strcmp(function, "TAG"))      this_fn = TAG;
          else if(!strcmp(function, "SPAWN"))    this_fn = SPAWN;
          else if(!strcmp(function, "CLIENT"))   this_fn = CLIENT;

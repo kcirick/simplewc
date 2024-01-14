@@ -3,7 +3,7 @@ TARGET  = simplewc
 
 CC = gcc
 MY_CFLAGS = $(CFLAGS) -g -Wall -DVERSION=\"$(VERSION)\" \
-   -DWLR_USE_UNSTABLE -DXWAYLAND \
+   -DWLR_USE_UNSTABLE -DXWAYLAND\
    $(shell pkg-config --cflags wlroots) \
    $(shell pkg-config --cflags xcb)
 MY_LFLAGS = $(LDFLAGS) -lwayland-server -lxkbcommon\

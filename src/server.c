@@ -33,6 +33,7 @@
 #include <wlr/types/wlr_viewporter.h>
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
+#include <wlr/types/wlr_gamma_control_v1.h>
 //
 //#include <wlr/types/wlr_input_method_v2.h>
 //#include <wlr/types/wlr_text_input_v3.h>
@@ -101,7 +102,8 @@ setCurrentTag(int tag, bool toggle)
       output->visible_tags = output->current_tag = TAGMASK(tag);
 
    focus_client(get_top_client_from_output(output, false), true);
-   arrange_output(output);
+   //arrange_output(output);
+   print_server_info();
 }
 
 void
@@ -130,20 +132,22 @@ tileTag()
          new_geom.y = output->usable_area.y + gap_width + bw;
          new_geom.width = (output->usable_area.width - (gap_width*(MIN(2,n)+1)))/MIN(2,n) - bw*2;
          new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
-         
-         set_client_geometry(client, new_geom);
+         client->geom = new_geom;
+
+         set_client_geometry(client, false);
       } else {
          new_geom.x = output->usable_area.x + output->usable_area.width/2 + gap_width/2 + bw;
          new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
          new_geom.height = (output->usable_area.height - (gap_width*n))/(n-1);
          new_geom.y = output->usable_area.y + (gap_width*i) + (new_geom.height*(i-1)) + bw;
          new_geom.height -= 2*bw;
+         client->geom = new_geom;
          
-         set_client_geometry(client, new_geom);
+         set_client_geometry(client, false);
       }
       i++;
    }
-   arrange_output(output);
+   //arrange_output(output);
 }
 
 struct simple_output*
@@ -160,20 +164,21 @@ print_server_info()
    struct simple_client* client;
 
    wl_list_for_each(output, &g_server->outputs, link) {
+      ipc_output_printstatus(output);
       say(DEBUG, "output %s", output->wlr_output->name);
       say(DEBUG, " -> cur_output = %u", output == g_server->cur_output);
       say(DEBUG, " -> tag = vis:%u / cur:%u", output->visible_tags, output->current_tag);
       wl_list_for_each(client, &g_server->clients, link) {
+         struct simple_client* focused_client;
+         get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
          say(DEBUG, " -> client");
+         say(DEBUG, "    -> client focused = %b", client == focused_client); 
          say(DEBUG, "    -> client title = %s", get_client_title(client));
          say(DEBUG, "    -> client tag = %u", client->tag);
          say(DEBUG, "    -> client fixed = %b", client->fixed);
          say(DEBUG, "    -> client visible = %b", client->visible);
       }
    }
-
-   wl_list_for_each(output, &g_server->outputs, link)
-      ipc_output_printstatus(output);
 }
 
 void
@@ -203,13 +208,22 @@ arrange_output(struct simple_output* output)
 
    get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
    
+   int n=0;
    wl_list_for_each(client, &g_server->clients, link) {
-      if(client->output == output){
+      //if(client->output == output){
+         if(client->visible && VISIBLEON(client, output)) n++;
          set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
          wlr_scene_node_set_enabled(&client->scene_tree->node, client->visible && VISIBLEON(client, output));
-      }
+      //}
    }
-   print_server_info();
+
+   if(n>0){
+      focused_client = get_top_client_from_output(output, false);
+      focus_client(focused_client, true);
+   } else
+      input_focus_surface(NULL);
+
+   //print_server_info();
    check_idle_inhibitor();
 }
 
@@ -217,6 +231,7 @@ arrange_output(struct simple_output* output)
 static void
 new_decoration_notify(struct wl_listener *listener, void *data)
 {
+   say(DEBUG, "new_decoration_notify");
    struct wlr_xdg_toplevel_decoration_v1 *decoration = data;
    wlr_xdg_toplevel_decoration_v1_set_mode(decoration, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 }
@@ -261,6 +276,17 @@ output_pm_set_mode_notify(struct wl_listener *listener, void *data)
          wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");;
          break;
    }
+}
+
+static void
+set_gamma_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "set_gamma_notify");
+  
+   struct wlr_gamma_control_manager_v1_set_gamma_event *event = data;
+   struct simple_output *output = event->output->data;
+   output->gamma_lut_changed = true;
+   wlr_output_schedule_frame(output->wlr_output);
 }
 
 //--- Lock session notify functions --------------------------------------
@@ -399,6 +425,7 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
       memset(&output->usable_area, 0, sizeof(output->usable_area));
       output->usable_area = box;
 
+      output->gamma_lut_changed = true;
       config_head->state.x = box.x;
       config_head->state.y = box.y;
    }
@@ -430,8 +457,26 @@ output_frame_notify(struct wl_listener *listener, void *data)
    struct simple_output *output = wl_container_of(listener, output, frame);
    struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(g_server->scene, output->wlr_output);
    
-   // Render the scene if needed and commit the output 
-   wlr_scene_output_commit(scene_output, NULL);
+   struct wlr_gamma_control_v1 *gamma_control;
+   struct wlr_output_state pending = {0};
+   if (output->gamma_lut_changed) {
+      say(DEBUG, "gamma_lut_changed true");
+      gamma_control = wlr_gamma_control_manager_v1_get_control(g_server->gamma_control_manager, output->wlr_output);
+      output->gamma_lut_changed = false;
+
+      if(!wlr_gamma_control_v1_apply(gamma_control, &pending))
+         wlr_scene_output_commit(scene_output, NULL);
+
+      if(!wlr_output_test_state(output->wlr_output, &pending)) {
+         wlr_gamma_control_v1_send_failed_and_destroy(gamma_control);
+         wlr_scene_output_commit(scene_output, NULL);
+      }
+      wlr_output_commit_state(output->wlr_output, &pending);
+      wlr_output_schedule_frame(output->wlr_output);
+   } else {
+      // Render the scene if needed and commit the output 
+      wlr_scene_output_commit(scene_output, NULL);
+   }
    
    struct timespec now;
    clock_gettime(CLOCK_MONOTONIC, &now);
@@ -596,6 +641,14 @@ prepareServer()
    wlr_primary_selection_v1_device_manager_create(g_server->display);
    wlr_fractional_scale_manager_v1_create(g_server->display, FRAC_SCALE_VERSION);
    
+   // initialize interface used to implement urgency hints TODO
+   //g_server->xdg_activation = wlr_xdg_activation_v1_create(g_server->display);
+   //LISTEN();
+
+   // gamma control manager
+   g_server->gamma_control_manager = wlr_gamma_control_manager_v1_create(g_server->display);
+   LISTEN(&g_server->gamma_control_manager->events.set_gamma, &g_server->set_gamma, set_gamma_notify);
+
    // create an output layout, i.e. wlroots utility for working with an arrangement of 
    // screens in a physical layout
    g_server->output_layout = wlr_output_layout_create();

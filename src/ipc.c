@@ -1,3 +1,4 @@
+#include <string.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_cursor.h>
 
@@ -6,12 +7,14 @@
 #include "layer.h"
 #include "client.h"
 #include "server.h"
+#include "action.h"
 #include "ipc.h"
 
 static void ipc_manager_release(struct wl_client *, struct wl_resource *);
 static void ipc_manager_get_output(struct wl_client *, struct wl_resource *, uint32_t, struct wl_resource *);
-static void ipc_output_printstatus_to(struct simple_ipc_output*);
+static void ipc_manager_send_action(struct wl_client *, struct wl_resource *, const char*);
 
+static void ipc_output_printstatus_to(struct simple_ipc_output*);
 static void ipc_output_release(struct wl_client *, struct wl_resource *);
 static void ipc_output_set_client_tags(struct wl_client *, struct wl_resource *, uint32_t, uint32_t);
 static void ipc_output_set_layout(struct wl_client *, struct wl_resource *, uint32_t);
@@ -19,14 +22,15 @@ static void ipc_output_set_tags(struct wl_client *, struct wl_resource *, uint32
 
 static struct zdwl_ipc_manager_v2_interface ipc_manager_implementation = {
    .release = ipc_manager_release,
-   .get_output = ipc_manager_get_output
+   .get_output = ipc_manager_get_output,
+   .send_action = ipc_manager_send_action
 };
 
 static struct zdwl_ipc_output_v2_interface ipc_output_implementation = {
    .release = ipc_output_release,
    .set_tags = ipc_output_set_tags,
    .set_layout = ipc_output_set_layout,
-   .set_client_tags = ipc_output_set_client_tags
+   .set_client_tags = ipc_output_set_client_tags,
 };
 
 //--- Public functions ---------------------------------------------------
@@ -96,6 +100,13 @@ ipc_manager_get_output(struct wl_client *client, struct wl_resource *resource, u
 	ipc_output_printstatus_to(ipc_output);
 }
 
+void
+ipc_manager_send_action(struct wl_client *client, struct wl_resource *resource, const char* action)
+{
+   say(INFO, "ipc_output_send_action: %s", action);
+   process_ipc_action(action);
+}
+
 //--- IPC output implementation ------------------------------------------
 void
 ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
@@ -134,6 +145,7 @@ ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
    ////////////////////////////////////////////////
 
 	//zdwl_ipc_output_v2_send_layout(ipc_output->resource, monitor->lt[monitor->sellt] - layouts);
+   //zdwl_ipc_output_v2_send_action(ipc_output->resource, "noop");
 	zdwl_ipc_output_v2_send_title(ipc_output->resource, title ? title : "broken");
 	zdwl_ipc_output_v2_send_appid(ipc_output->resource, appid ? appid : "broken");
 	//zdwl_ipc_output_v2_send_layout_symbol(ipc_output->resource, monitor->ltsymbol);
@@ -179,24 +191,7 @@ ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *resourc
 void
 ipc_output_set_layout(struct wl_client *client, struct wl_resource *resource, uint32_t index)
 {
-   /*
-	struct DwlIpcOutput *ipc_output;
-	struct simple_output *output;
-
-	ipc_output = wl_resource_get_user_data(resource);
-	if (!ipc_output)
-		return;
-
-	output = ipc_output->output;
-	if (index >= LENGTH(layouts))
-		return;
-	if (index != monitor->lt[monitor->sellt] - layouts)
-		monitor->sellt ^= 1;
-
-	monitor->lt[monitor->sellt] = &layouts[index];
-	arrange_output(output);
-	printstatus();
-   */
+   //
 }
 
 void
@@ -204,21 +199,20 @@ ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint
 {
 	struct simple_ipc_output *ipc_output;
 	struct simple_output *output;
-	//unsigned int newtags = tagmask & TAGMASK;
 	unsigned int newtags = tagmask;
 
 	ipc_output = wl_resource_get_user_data(resource);
 	if (!ipc_output) return;
 
+   say(INFO, "ipc_output_set_tags");
+
 	output = ipc_output->output;
 
-	//if (!newtags || newtags == output->tagset[monitor->seltags])
 	if (!newtags || newtags == output->visible_tags)
 		return;
 	//if (toggle_tagset)
 	//	monitor->seltags ^= 1;
 
-	//output->tagset[monitor->seltags] = newtags;
 	output->visible_tags = newtags;
    if(toggle_tagset) output->current_tag = newtags;
 	arrange_output(output);

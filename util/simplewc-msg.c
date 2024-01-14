@@ -16,7 +16,7 @@
 
 
 enum MessageType     { DEBUG, INFO, WARNING, ERROR, NMSG };
-enum Mode            { NOMODE = 0, SET = 1<<0, GET = 1<<1, WATCH = 1<<2 | GET };
+enum Mode            { NOMODE=0, SET=1<<0, GET=1<<1, WATCH=1<<2 | GET, ACTION=1<<3 };
 
 static const char *msg_str[NMSG] = { "DEBUG", "INFO", "WARNING", "ERROR" };
 
@@ -83,7 +83,9 @@ static void simple_ipc_output_tag(void *, struct zdwl_ipc_output_v2 *, uint32_t,
 static void simple_ipc_output_title(void *, struct zdwl_ipc_output_v2 *, const char*);
 static void simple_ipc_output_appid(void *, struct zdwl_ipc_output_v2 *, const char*);
 static void simple_ipc_output_fullscreen(void *, struct zdwl_ipc_output_v2 *, uint32_t);
+static void simple_ipc_output_action(void *, struct zdwl_ipc_output_v2 *, const char*);
 static void simple_ipc_output_frame(void *, struct zdwl_ipc_output_v2 *);
+
 static const struct zdwl_ipc_output_v2_listener ipc_output_listener = {
    .active = simple_ipc_output_active,
    .tag = simple_ipc_output_tag,
@@ -147,6 +149,12 @@ simple_ipc_output_fullscreen(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_outp
    char* output_name = data;
    if(output_name) say(INFO, "%s ", output_name);
    printf("fullscreen %u\n", is_fullscreen);
+}
+
+void 
+simple_ipc_output_action(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, const char* action)
+{
+   say(INFO, "simple_ipc_output_action\n");
 }
 
 void
@@ -255,6 +263,12 @@ global_remove(void *data, struct wl_registry *wl_registry, uint32_t name)
    }
 }
 
+void
+send_action(const char* action)
+{
+   zdwl_ipc_manager_v2_send_action(ipc_manager, action);
+}
+
 //--- Main function ------------------------------------------------------
 int 
 main(int argc, char **argv) 
@@ -266,11 +280,12 @@ main(int argc, char **argv)
       if(!strcmp(iarg, "--set"))    mode = SET;
       if(!strcmp(iarg, "--get"))    mode = GET;
       if(!strcmp(iarg, "--watch"))  mode = WATCH;
+      if(!strcmp(iarg, "--action")) mode = ACTION;
    }
    if(mode==NOMODE) say(ERROR, "No mode selected!\n");
    
    // second pass - get the arguments
-   for(int i=1; i<argc; i++){
+   for(int i=2; i<argc; i++){
       char* iarg = argv[i];
       if(mode==SET){
          if(!strcmp(iarg, "--client") && ((i+1)<argc)){
@@ -295,6 +310,9 @@ main(int argc, char **argv)
          if(!strcmp(iarg, "--tag")){
             flag_tag = true;
          }
+      } else if(mode==ACTION) {
+         say(INFO, "iarg = %s\n", iarg);
+         sprintf(arg, iarg ? iarg:"noop" );
       }
    }
    if(mode&GET && !(flag_tagcount || flag_tag || flag_output || flag_client)){
@@ -314,6 +332,9 @@ main(int argc, char **argv)
 
    if(!ipc_manager)
       say(ERROR, "Bad IPC protocol\n");
+
+   if(mode==ACTION) 
+      send_action(arg);
 
    wl_display_roundtrip(display);
 

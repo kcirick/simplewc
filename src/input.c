@@ -8,6 +8,7 @@
 #include <wlr/types/wlr_primary_selection.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_xcursor_manager.h>
+#include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/edges.h>
 
 #include "globals.h"
@@ -58,8 +59,8 @@ kb_modifiers_notify(struct wl_listener *listener, void *data)
          // change stacking order and focus client 
          wl_list_remove(&client->link);
          wl_list_insert(&g_server->clients, &client->link);
-         focus_client(client, true);
          g_server->grabbed_client=NULL;
+         focus_client(client, true);
          arrange_output(g_server->cur_output);
       }
    }
@@ -92,7 +93,7 @@ kb_key_notify(struct wl_listener *listener, void *data)
             if (modifiers ^ keymap->mask) continue;
 
             if (syms[i] == keymap->keysym){
-               key_function(g_server, keymap);
+               key_function(keymap);
                handled=true;
             }
          }
@@ -126,7 +127,7 @@ process_cursor_move(uint32_t time)
    client->geom.x = g_server->cursor->x - g_server->grab_x;
    client->geom.y = g_server->cursor->y - g_server->grab_y;
 
-   set_client_geometry(client, client->geom);
+   set_client_geometry(client, true);
 }
 
 static void 
@@ -167,7 +168,10 @@ process_cursor_resize(uint32_t time)
    client->geom.width = new_right - new_left;
    client->geom.height = new_bottom - new_top;
 
-   set_client_geometry(client, client->geom);
+   if(client->type==XDG_SHELL_CLIENT)
+      wlr_xdg_toplevel_set_bounds(client->xdg_surface->toplevel, client->geom.width, client->geom.height);
+   
+   set_client_geometry(client, true);
 }
 
 static void 
@@ -261,10 +265,11 @@ cursor_button_notify(struct wl_listener *listener, void *data)
    switch (event->state) {
       case WLR_BUTTON_RELEASED:
          // button release
+         wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");
          g_server->cursor_mode = CURSOR_PASSTHROUGH;
          g_server->grabbed_client = NULL;
-         wlr_seat_pointer_notify_button(g_server->seat, event->time_msec, event->button, event->state);
-         return;
+         //wlr_seat_pointer_notify_button(g_server->seat, event->time_msec, event->button, event->state);
+         //return;
          break;
       case WLR_BUTTON_PRESSED:
          // button press
@@ -282,11 +287,7 @@ cursor_button_notify(struct wl_listener *listener, void *data)
                   return;
                }
             }
-            return;
-         }
-   
-         //press on client 
-         if(ctype!=LAYER_SHELL_CLIENT){
+         } else if(ctype!=LAYER_SHELL_CLIENT) { //press on client
             focus_client(client, true);
             uint32_t resize_edges = get_resize_edges(client, g_server->cursor->x, g_server->cursor->y);
             wl_list_for_each(mousemap, &g_config->mouse_bindings, link) {

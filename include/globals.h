@@ -11,7 +11,7 @@
 
 #define MAX_TAGS 9
 
-#define XDG_SHELL_VERSION (3)
+#define XDG_SHELL_VERSION (6)
 #define LAYER_SHELL_VERSION (4)
 #define COMPOSITOR_VERSION (5)
 #define FRAC_SCALE_VERSION (1)
@@ -29,7 +29,7 @@
 
 //--- enums -----
 enum BorderColours   { FOCUSED, UNFOCUSED, URGENT, MARKED, FIXED, OUTLINE, NBORDERCOL };
-enum KeyFunctions    { SPAWN, QUIT, TAG, CLIENT, NFUNC };
+enum KeyFunctions    { SPAWN, QUIT, LOCK, TAG, CLIENT, NFUNC };
 enum MouseContext    { CONTEXT_ROOT, CONTEXT_CLIENT, NCONTEXT};
 enum CursorMode      { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE, CURSOR_PRESSED };
 
@@ -54,6 +54,8 @@ struct simple_config {
 
    float background_colour[4];
    float border_colour[NBORDERCOL][4];
+
+   char lock_cmd[64];
 
    struct wl_list key_bindings;
    struct wl_list mouse_bindings;

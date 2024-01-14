@@ -1,5 +1,20 @@
 TODO
-	* : Resize client borders when the configure is called
+	* : Implement blur effect, maybe? 
+	* : Implement interface to activate urgency hints
+
+2024-01-14
+	* dwl-ipc-unstable-v2.xml: add send_action request to allow ipc client to send actions
+	* ipc.c: implement send_action request call
+	* util/simplewc-msg.c: Allow send_action request call through "--action" flag
+	* action.c: add process_ipc_action() function
+	* config.c: add LOCK function and lock_cmd entries
+	* config/configrc: add lock_cmd entry
+	* client.c: ensure the client border follows the surface size (when interactive mode)
+	* client.c: Resize XWL client on request_configure event
+	* server.c: remove focus on clients not on visible tags when calling arrange_output() (and also fix re-focus)
+	* server.c: Implement wlr_gamma_control_manager_v1
+	* client.c: Remove unused request_move/request_resize notifiers
+	* client.c: Fix broken references when compiling without XWayland support
 
 2024-01-10
 	* main.c, Makefile: Change the name from SWC to SimpleWC

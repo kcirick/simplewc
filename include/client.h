@@ -18,9 +18,6 @@ struct simple_client {
    struct wl_listener unmap;
    struct wl_listener destroy;
    struct wl_listener commit;
-   struct wl_listener request_move;
-   struct wl_listener request_resize;
-//   struct wl_listener request_configure;
 
 #if XWAYLAND
    struct wl_listener associate;
@@ -36,7 +33,6 @@ struct simple_client {
    uint32_t tag;
    bool fixed;
 
-   //bool mapped;
    bool visible;
 
    // geometry of the wlr_surface within the view as currently displayed
@@ -61,7 +57,7 @@ void focus_client(struct simple_client*, bool);
 void begin_interactive(struct simple_client*, enum CursorMode, uint32_t);
 
 void get_client_geometry(struct simple_client*, struct wlr_box*);
-void set_client_geometry(struct simple_client*, struct wlr_box);
+void set_client_geometry(struct simple_client*, bool);
 void set_client_border_colour(struct simple_client*, int);
 
 void xdg_new_surface_notify(struct wl_listener*, void*);
