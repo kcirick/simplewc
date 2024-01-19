@@ -10,7 +10,14 @@
 #include "globals.h"
 #include "server.h"
 
-static const char *msg_str[NMSG] = { "DEBUG", "INFO", "WARNING", "ERROR" };
+#define CRED      "\033[31m"
+#define CGREEN    "\033[32m"
+#define CYELLOW   "\033[33m"
+#define CBLUE     "\033[34m"
+#define CPURPLE   "\033[35m"
+#define CRESET    "\033[0m"
+
+static const char *msg_str[NMSG] = { CBLUE"DEBUG"CRESET, "INFO", CYELLOW"WARNING"CRESET, CRED"ERROR"CRESET };
 static int info_level = WLR_SILENT;
 
 struct wlr_session *g_session;
@@ -55,14 +62,14 @@ spawn(char* cmd)
       }
       exit(0);
    }
-   waitpid(pid, NULL, 0);
+   //waitpid(pid, NULL, 0);
 }
 
 void 
 signal_handler(int sig) 
 {
    if(sig == SIGCHLD) {
-#ifdef XWAYLAND
+#if XWAYLAND
       siginfo_t in;
       while (  !waitid(P_ALL, 0, &in, WEXITED|WNOHANG|WNOWAIT) 
                && in.si_pid

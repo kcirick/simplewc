@@ -199,21 +199,22 @@ process_cursor_motion(uint32_t time)
    double sx=0, sy=0;
    struct wlr_seat *wlr_seat = g_server->seat;
    struct wlr_surface *surface = NULL;
-   struct simple_client *client = NULL;
+   struct simple_client *client = NULL, *focused_client = NULL;
    struct simple_layer_surface *lsurface = NULL;
    // We actually want the top level
-   get_client_at(g_server->cursor->x, g_server->cursor->y, &client, &surface, &sx, &sy);
+   int ctype = get_client_at(g_server->cursor->x, g_server->cursor->y, &client, &surface, &sx, &sy);
 
-   if(g_server->cursor_mode==CURSOR_PRESSED && g_server->seat->drag){ 
-      int ctype = get_client_from_surface(g_server->seat->pointer_state.focused_surface, &client, &lsurface);
-      if(ctype!=-1){
+   int ctype_focused = get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, &lsurface);
+   if(g_server->cursor_mode==CURSOR_PRESSED && !g_server->seat->drag){ 
+      if(ctype_focused!=-1){
          surface = g_server->seat->pointer_state.focused_surface;
-         sx = g_server->cursor->x - (ctype==LAYER_SHELL_CLIENT ? lsurface->geom.x : client->geom.x);
-         sy = g_server->cursor->y - (ctype==LAYER_SHELL_CLIENT ? lsurface->geom.y : client->geom.y);
+         sx = g_server->cursor->x - (ctype_focused==LAYER_SHELL_CLIENT ? lsurface->geom.x : focused_client->geom.x);
+         sy = g_server->cursor->y - (ctype_focused==LAYER_SHELL_CLIENT ? lsurface->geom.y : focused_client->geom.y);
       }
    }
 
-   if(time>0 && client && g_config->sloppy_focus)
+   if(time>0 && client && ctype!=LAYER_SHELL_CLIENT && ctype_focused!=LAYER_SHELL_CLIENT 
+      && client != focused_client && g_config->sloppy_focus && !g_server->seat->drag)
       focus_client(client, false);
 
    if(surface) {
@@ -266,7 +267,7 @@ cursor_button_notify(struct wl_listener *listener, void *data)
       case WLR_BUTTON_RELEASED:
          // button release
          wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");
-         g_server->cursor_mode = CURSOR_PASSTHROUGH;
+         g_server->cursor_mode = CURSOR_NORMAL;
          g_server->grabbed_client = NULL;
          //wlr_seat_pointer_notify_button(g_server->seat, event->time_msec, event->button, event->state);
          //return;
@@ -298,6 +299,9 @@ cursor_button_notify(struct wl_listener *listener, void *data)
                   return;
                }
             }
+         } else {
+            say(DEBUG, "Layer Shell input");
+            input_focus_surface(surface);
          }
          break;
    } // switch
@@ -478,7 +482,7 @@ input_init()
    g_server->cursor_manager = wlr_xcursor_manager_create(NULL, 24);
    wlr_xcursor_manager_load(g_server->cursor_manager, 1);
 
-   g_server->cursor_mode = CURSOR_PASSTHROUGH;
+   g_server->cursor_mode = CURSOR_NORMAL;
    LISTEN(&g_server->cursor->events.motion, &g_server->cursor_motion, cursor_motion_notify);
    LISTEN(&g_server->cursor->events.motion_absolute, &g_server->cursor_motion_abs, cursor_motion_abs_notify);
    LISTEN(&g_server->cursor->events.button, &g_server->cursor_button, cursor_button_notify);
@@ -486,14 +490,6 @@ input_init()
    LISTEN(&g_server->cursor->events.frame, &g_server->cursor_frame, cursor_frame_notify);
 
    //input method init
-   g_server->input_method = wlr_input_method_manager_v2_create(g_server->display);
-   g_server->text_input = wlr_text_input_manager_v3_create(g_server->display);
-   
-   /*
-   server->im_relay = calloc(1, sizeof(struct simple_input_method_relay));
-   wl_list_init(&server->im_relay->text_inputs);
-
-   LISTEN(&server->text_input->events.text_input, &server->im_relay->text_input_new, relay_text_input_notify);
-   LISTEN(&server->input_method->events.input_method, &server->im_relay->input_method_new, relay_input_method_notify);
-   */
+   wlr_input_method_manager_v2_create(g_server->display);
+   wlr_text_input_manager_v3_create(g_server->display);
 }

@@ -11,7 +11,7 @@ to teach myself the basics of window management. (formerly SimpleWay).
  - Built upon [tinywl], inspirations from [dwl] and [labwc]
  - Features:
    - No frills (menu, titlebar, icons, pixmap themes, etc...)
-   - Text config file (default $HOME/.config/swwm/configrc)
+   - Text config file (default $HOME/.config/simplewc/configrc)
    - Simple tiling (manual left-right tiling or auto-tile like DWL/DWM)
    - simplewc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])
 
@@ -28,7 +28,7 @@ Usage:
 
 `> simplewc-msg (--get | --watch) [--output][--tag][--client (title | appid)]`
 
-`> simplewc-msg --action (quit | lock)`
+`> simplewc-msg --action (quit | reconfig | lock)`
 
 
 ## Status

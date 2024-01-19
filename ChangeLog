@@ -2,6 +2,18 @@ TODO
 	* : Implement blur effect, maybe? 
 	* : Implement interface to activate urgency hints
 
+2024-01-19
+	* config.c: Remove unused config tag_names
+	* config.c: Add reloadConfig() to reload config file
+	* action.c: Add reconfig option to process_ipc_action(). This will enable reloading of config file from simplewc-msg
+	* input.c: Fix a bug where focus_client() is called with each process_cursor_motion() when sloppy_focus=true 
+	* globals.h: change name from CURSOR_PASSTHROUGH to CURSOR_NORMAL
+	* config.c: remove AUTOSTART as wl_list. Create autostart a reference to a script that will execute on launch
+	* config/autostart.sh: create autostart script
+	* main.c: Colorize the log output 
+	* layer.c: give input to layer surface upon map. Give next client input focus upon destroy
+	* input.c: Fix a bug causing seg fault when moving drag icon out of a client
+
 2024-01-14
 	* dwl-ipc-unstable-v2.xml: add send_action request to allow ipc client to send actions
 	* ipc.c: implement send_action request call

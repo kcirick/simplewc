@@ -8,6 +8,7 @@
 
 #include "globals.h"
 #include "layer.h"
+#include "input.h"
 #include "client.h"
 #include "server.h"
 
@@ -71,14 +72,14 @@ arrange_layers(struct simple_output *output)
 static void 
 layer_surface_map_notify(struct wl_listener *listener, void *data) 
 {
-   //
    say(DEBUG, "layer_surface_map_notify");
+   struct simple_layer_surface *lsurface = wl_container_of(listener, lsurface, map);
+   input_focus_surface(lsurface->scene_layer_surface->layer_surface->surface);
 }
 
 static void 
 layer_surface_unmap_notify(struct wl_listener *listener, void *data) 
 {
-   //
    say(DEBUG, "layer_surface_unmap_notify");
 
    struct simple_layer_surface *lsurface = wl_container_of(listener, lsurface, unmap);
@@ -89,8 +90,6 @@ layer_surface_unmap_notify(struct wl_listener *listener, void *data)
 
    if(wlr_lsurface->output && (lsurface->output = wlr_lsurface->output->data))
       arrange_layers(lsurface->output);
-   if(wlr_lsurface->surface == g_server->seat->keyboard_state.focused_surface)
-      focus_client(get_top_client_from_output(g_server->cur_output, false), false);
 }
 
 static void 
@@ -124,9 +123,9 @@ layer_surface_commit_notify(struct wl_listener *listener, void *data)
 static void 
 layer_surface_destroy_notify(struct wl_listener *listener, void *data) 
 {
-   //
    say(DEBUG, "layer_surface_destroy_notify");
    struct simple_layer_surface *lsurface = wl_container_of(listener, lsurface, destroy);
+   struct simple_output * output = g_server->cur_output;
 
    wl_list_remove(&lsurface->link);
    wl_list_remove(&lsurface->destroy.link);
@@ -135,6 +134,8 @@ layer_surface_destroy_notify(struct wl_listener *listener, void *data)
    wl_list_remove(&lsurface->surface_commit.link);
    //wlr_scene_node_destroy(&lsurface->scene_tree->node);
    free(lsurface);
+
+   focus_client(get_top_client_from_output(output, false), true);
 }
 
 //------------------------------------------------------------------------

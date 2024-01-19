@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <string.h>
 #include <wlr/backend/session.h>
 #include <wlr/types/wlr_scene.h>
@@ -34,7 +35,7 @@ key_function(struct keymap *keymap)
 
    //--- CLIENT -----
    struct wlr_surface *surface = g_server->seat->keyboard_state.focused_surface;
-   struct simple_client* client;
+   struct simple_client* client = NULL;
    int type = get_client_from_surface(surface, &client, NULL);
 
    if(keymap->keyfn==CLIENT) {
@@ -83,8 +84,9 @@ mouse_function(struct simple_client *client, struct mousemap *mousemap, int resi
 void
 process_ipc_action(const char* action)
 {
-   if(!strcmp(action, "test"))   say(INFO, "Action test");
-   if(!strcmp(action, "quit"))   wl_display_terminate(g_server->display);
-   if(!strcmp(action, "lock"))   spawn(g_config->lock_cmd);
+   if(!strcmp(action, "test"))      say(INFO, "Action test");
+   if(!strcmp(action, "quit"))      wl_display_terminate(g_server->display);
+   if(!strcmp(action, "lock"))      spawn(g_config->lock_cmd);
+   if(!strcmp(action, "reconfig"))  reloadConfiguration();
 }
 

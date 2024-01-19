@@ -35,8 +35,6 @@
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
 //
-//#include <wlr/types/wlr_input_method_v2.h>
-//#include <wlr/types/wlr_text_input_v3.h>
 //#include <wlr/types/wlr_foreign_toplevel_management_v1.h>
 
 #include "dwl-ipc-unstable-v2-protocol.h"
@@ -169,7 +167,7 @@ print_server_info()
       say(DEBUG, " -> cur_output = %u", output == g_server->cur_output);
       say(DEBUG, " -> tag = vis:%u / cur:%u", output->visible_tags, output->current_tag);
       wl_list_for_each(client, &g_server->clients, link) {
-         struct simple_client* focused_client;
+         struct simple_client* focused_client=NULL;
          get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
          say(DEBUG, " -> client");
          say(DEBUG, "    -> client focused = %b", client == focused_client); 
@@ -204,26 +202,24 @@ void
 arrange_output(struct simple_output* output)
 {
    say(DEBUG, "arrange_output");
-   struct simple_client* client, *focused_client;
+   struct simple_client* client, *focused_client=NULL;
 
    get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
    
    int n=0;
    wl_list_for_each(client, &g_server->clients, link) {
-      //if(client->output == output){
-         if(client->visible && VISIBLEON(client, output)) n++;
-         set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
-         wlr_scene_node_set_enabled(&client->scene_tree->node, client->visible && VISIBLEON(client, output));
-      //}
+      if(client->visible && VISIBLEON(client, output)) n++;
+      set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
+      wlr_scene_node_set_enabled(&client->scene_tree->node, client->visible && VISIBLEON(client, output));
    }
 
    if(n>0){
-      focused_client = get_top_client_from_output(output, false);
+      if(!focused_client)
+         focused_client = get_top_client_from_output(output, false);
       focus_client(focused_client, true);
    } else
       input_focus_surface(NULL);
 
-   //print_server_info();
    check_idle_inhibitor();
 }
 
@@ -240,7 +236,6 @@ static void
 inhibitor_destroy_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "inhibitor_destroy_notify");
-
    wlr_idle_notifier_v1_set_inhibited(g_server->idle_notifier, 0);
 }
 
@@ -515,7 +510,6 @@ static void
 new_output_notify(struct wl_listener *listener, void *data) 
 {
    say(DEBUG, "new_output_notify");
-   
    struct wlr_output *wlr_output = data;
 
    // Don't configure any non-desktop displays, such as VR headsets
@@ -757,9 +751,7 @@ startServer(char* start_cmd)
 
    // Run autostarts and startup comand if defined
    if(start_cmd[0]!='\0') spawn(start_cmd);
-   struct autostart *autostart;
-   wl_list_for_each(autostart, &g_config->autostarts, link)
-      spawn(autostart->command);
+   if(g_config->autostart_script[0]!='\0') spawn(g_config->autostart_script);
 }
 
 void 

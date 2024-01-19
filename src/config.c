@@ -63,18 +63,20 @@ set_defaults()
    colour2rgba("#00FF00", g_config->border_colour[MARKED]);
    colour2rgba("#0000FF", g_config->border_colour[FIXED]);
    colour2rgba("#FFFFFF", g_config->border_colour[OUTLINE]);
+
+   g_config->autostart_script[0] = '\0';
 }
 
 void
 readConfiguration(char* filename) 
 {
    say(INFO, "Reading configuration file %s", filename);
+   strncpy(g_config->config_file_name, filename, sizeof g_config->config_file_name);
 
    set_defaults();
 
    wl_list_init(&g_config->key_bindings);
    wl_list_init(&g_config->mouse_bindings);
-   wl_list_init(&g_config->autostarts);
 
    FILE *f;
    if(!(f=fopen(filename, "r")))
@@ -90,25 +92,14 @@ readConfiguration(char* filename)
       token = strtok(buffer, "=");
       strncpy(id, token, sizeof id); 
       trim(id);
-      //if(id==NULL) continue;
 
       token=strtok(NULL, "=");
       strncpy(value, token, sizeof value);
       trim(value);
-      //if(value==NULL) continue;
 
       say(DEBUG, "config id = '%s' / value = '%s'", id, value);
+         
       if(!strcmp(id, "n_tags")) g_config->n_tags=atoi(value);
-      if(!strcmp(id, "tag_names")){
-         token = strtok(value, ";");
-         strncpy(g_config->tag_names[0], token, sizeof g_config->tag_names[0]);
-         trim(g_config->tag_names[0]);
-         for(int i=1; i<g_config->n_tags; i++){
-            token = strtok(NULL, ";");
-            strncpy(g_config->tag_names[i], token, sizeof g_config->tag_names[i]);
-            trim(g_config->tag_names[i]);
-         }
-      }
 
       if(!strcmp(id, "border_width"))     g_config->border_width = atoi(value);
       if(!strcmp(id, "tile_gap_width"))   g_config->tile_gap_width = atoi(value);
@@ -123,7 +114,9 @@ readConfiguration(char* filename)
       if(!strcmp(id, "border_colour_fixed"))    colour2rgba(value, g_config->border_colour[FIXED]);
       if(!strcmp(id, "border_colour_outline"))  colour2rgba(value, g_config->border_colour[OUTLINE]);
 
-      if(!strcmp(id, "lock_cmd"))      strncpy(g_config->lock_cmd, value, sizeof g_config->lock_cmd);;
+      if(!strcmp(id, "lock_cmd"))      strncpy(g_config->lock_cmd, value, sizeof g_config->lock_cmd);
+
+      if(!strcmp(id, "autostart"))     strncpy(g_config->autostart_script, value, sizeof g_config->autostart_script);
 
       if(!strcmp(id, "KEY")){
          char binding[32];
@@ -227,12 +220,13 @@ readConfiguration(char* filename)
 
          wl_list_insert(&g_config->mouse_bindings, &mousebind->link);
       }
-
-      if(!strcmp(id, "AUTOSTART")){
-         struct autostart *autostart = calloc(1, sizeof(struct autostart));
-         strncpy(autostart->command, value, sizeof autostart->command);
-
-         wl_list_insert(&g_config->autostarts, &autostart->link);
-      }
    }
+}
+
+void
+reloadConfiguration() {
+   if(g_config->config_file_name[0]=='\0')
+      say(ERROR, "config file %s could no longer be found!", g_config->config_file_name);
+
+   readConfiguration(g_config->config_file_name);
 }

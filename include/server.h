@@ -51,7 +51,7 @@ struct simple_server {
    // seat and input
    struct wlr_seat *seat;
 
-   struct wl_list inputs;   
+   struct wl_list inputs;
    struct wl_listener new_input;
 
    struct wlr_cursor *cursor;
@@ -71,11 +71,6 @@ struct simple_server {
    struct wl_listener request_start_drag;
    struct wl_listener start_drag;
    struct wl_listener destroy_drag_icon;
-
-   // input method
-   struct simple_input_method_relay *im_relay;
-   struct wlr_text_input_manager_v3 *text_input;
-   struct wlr_input_method_manager_v2 *input_method;
 
    // session idle notifier
    struct wlr_idle_notifier_v1 *idle_notifier;

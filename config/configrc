@@ -18,9 +18,8 @@ border_colour_outline = #FFFFFF
 #--- Command for locking -----
 lock_cmd = swaylock -c 000000
 
-#--- Autostarts (in sequence -----
-#AUTOSTART = swayidle -w timeout 900 'swaylock -c 000000'
-#AUTOSTART = waybar
+#--- Autostart script  -----
+#autostart = ~/.config/simplewc/autostart.sh 
 
 #--- Key Bindings -----
 KEY = A+q QUIT 0

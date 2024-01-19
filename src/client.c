@@ -291,9 +291,8 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
    struct wlr_layer_surface_v1 *ls = wlr_layer_surface_v1_try_from_wlr_surface(root_surface);
    if(ls) {
       //say(DEBUG, "LAYER");
-      *lsurface = ls->data; 
-      type = (*lsurface)->type;
-      return type;
+      if(lsurface) *lsurface = ls->data; 
+      return LAYER_SHELL_CLIENT;
    }
 
    struct wlr_xdg_surface *tmp_s;
@@ -535,7 +534,7 @@ unmap_notify(struct wl_listener *listener, void *data)
 
    // reset the cursor mode if the grabbed client was unmapped
    if(client == g_server->grabbed_client) {
-      g_server->cursor_mode = CURSOR_PASSTHROUGH;
+      g_server->cursor_mode = CURSOR_NORMAL;
       g_server->grabbed_client = NULL;
    }
    
@@ -552,8 +551,6 @@ unmap_notify(struct wl_listener *listener, void *data)
 
    if(client->scene_tree)
       wlr_scene_node_destroy(&client->scene_tree->node);
-   //if(client->scene_surface_tree)
-   //   wlr_scene_node_destroy(&client->scene_surface_tree->node);
 }
 
 static void 

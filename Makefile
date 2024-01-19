@@ -23,11 +23,12 @@ OBJECTS = $(addprefix obj/, $(notdir $(SOURCES:.c=.o)))
 CRED     = "\\033[31m"
 CGREEN   = "\\033[32m"
 CYELLOW  = "\\033[33m"
+CBLUE    = "\\033[34m"
 CPURPLE  = "\\033[35m"
 CRESET   = "\\033[0m"
 
 #-------------------------------------------------------------------------
-all: objdir $(TARGET) simplewc-msg 
+all: obj/ $(TARGET) simplewc-msg 
 
 include/wlr-output-power-management-unstable-v1-protocol.h:
 	@echo " [ $(CGREEN)WL$(CRESET) ] Creating $@"
@@ -66,7 +67,7 @@ obj/%.o: src/%.c $(HEADERS)
 	@echo " [ $(CGREEN)CC$(CRESET) ] $< -> $@"
 	@$(CC) $(MY_CFLAGS) -Iinclude -o $@ -c $<
 
-objdir:
+obj/: 
 	@echo " [ $(CYELLOW)MKDIR$(CRESET) ] obj"
 	@mkdir -p obj
 

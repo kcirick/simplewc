@@ -9,8 +9,6 @@
 #include <wlr/backend/session.h>
 #include <xkbcommon/xkbcommon.h>
 
-#define MAX_TAGS 9
-
 #define XDG_SHELL_VERSION (6)
 #define LAYER_SHELL_VERSION (4)
 #define COMPOSITOR_VERSION (5)
@@ -31,7 +29,7 @@
 enum BorderColours   { FOCUSED, UNFOCUSED, URGENT, MARKED, FIXED, OUTLINE, NBORDERCOL };
 enum KeyFunctions    { SPAWN, QUIT, LOCK, TAG, CLIENT, NFUNC };
 enum MouseContext    { CONTEXT_ROOT, CONTEXT_CLIENT, NCONTEXT};
-enum CursorMode      { CURSOR_PASSTHROUGH, CURSOR_MOVE, CURSOR_RESIZE, CURSOR_PRESSED };
+enum CursorMode      { CURSOR_NORMAL, CURSOR_MOVE, CURSOR_RESIZE, CURSOR_PRESSED };
 
 enum MessageType        { DEBUG, INFO, WARNING, ERROR, NMSG };
 enum ClientType         { XDG_SHELL_CLIENT, LAYER_SHELL_CLIENT, XWL_MANAGED_CLIENT, XWL_UNMANAGED_CLIENT };
@@ -45,8 +43,9 @@ enum NetAtoms  {NetWMWindowTypeDialog, NetWMWindowTypeSplash, NetWMWindowTypeToo
 
 //--- structs -----
 struct simple_config {
+   char config_file_name[64];
+
    int n_tags;
-   char tag_names[MAX_TAGS][32];
    int border_width;
    int tile_gap_width;
    bool sloppy_focus;
@@ -56,10 +55,10 @@ struct simple_config {
    float border_colour[NBORDERCOL][4];
 
    char lock_cmd[64];
+   char autostart_script[64];
 
    struct wl_list key_bindings;
    struct wl_list mouse_bindings;
-   struct wl_list autostarts;
 };
 
 struct keymap {
@@ -80,11 +79,6 @@ struct mousemap {
    struct wl_list link;
 };
 
-struct autostart {
-   struct wl_list link;
-   char command[128];
-};
-
 //--- global variables -----
 extern struct simple_server* g_server;
 extern struct wlr_session* g_session;
@@ -92,9 +86,11 @@ extern struct simple_config* g_config;
 
 //--- functions in config.c -----
 void readConfiguration(char*);
+void reloadConfiguration();
 
 //--- functions in main.c -----
 void say(int, const char*, ...);
 void spawn(char*);
+void send_signal(int);
 
 #endif

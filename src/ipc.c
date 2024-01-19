@@ -17,7 +17,6 @@ static void ipc_manager_send_action(struct wl_client *, struct wl_resource *, co
 static void ipc_output_printstatus_to(struct simple_ipc_output*);
 static void ipc_output_release(struct wl_client *, struct wl_resource *);
 static void ipc_output_set_client_tags(struct wl_client *, struct wl_resource *, uint32_t, uint32_t);
-static void ipc_output_set_layout(struct wl_client *, struct wl_resource *, uint32_t);
 static void ipc_output_set_tags(struct wl_client *, struct wl_resource *, uint32_t, uint32_t);
 
 static struct zdwl_ipc_manager_v2_interface ipc_manager_implementation = {
@@ -29,7 +28,6 @@ static struct zdwl_ipc_manager_v2_interface ipc_manager_implementation = {
 static struct zdwl_ipc_output_v2_interface ipc_output_implementation = {
    .release = ipc_output_release,
    .set_tags = ipc_output_set_tags,
-   .set_layout = ipc_output_set_layout,
    .set_client_tags = ipc_output_set_client_tags,
 };
 
@@ -51,11 +49,7 @@ ipc_manager_bind(struct wl_client *client, void *data, uint32_t version, uint32_
 
 	wl_resource_set_implementation(manager_resource, &ipc_manager_implementation, NULL, ipc_manager_destroy);
 
-	//zdwl_ipc_manager_v2_send_tags(manager_resource, MAX_TAGS);
 	zdwl_ipc_manager_v2_send_tags(manager_resource, g_config->n_tags);
-
-	//for (int i = 0; i < LENGTH(layouts); i++)
-	//	zdwl_ipc_manager_v2_send_layout(manager_resource, layouts[i].symbol);
 }
 
 void
@@ -144,11 +138,8 @@ ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
 	appid = focused ? get_client_appid(focused) : "";
    ////////////////////////////////////////////////
 
-	//zdwl_ipc_output_v2_send_layout(ipc_output->resource, monitor->lt[monitor->sellt] - layouts);
-   //zdwl_ipc_output_v2_send_action(ipc_output->resource, "noop");
 	zdwl_ipc_output_v2_send_title(ipc_output->resource, title ? title : "broken");
 	zdwl_ipc_output_v2_send_appid(ipc_output->resource, appid ? appid : "broken");
-	//zdwl_ipc_output_v2_send_layout_symbol(ipc_output->resource, monitor->ltsymbol);
 	//if (wl_resource_get_version(ipc_output->resource) >= ZDWL_IPC_OUTPUT_V2_FULLSCREEN_SINCE_VERSION) {
 	//	zdwl_ipc_output_v2_send_fullscreen(ipc_output->resource, focused ? focused->isfullscreen : 0);
 	//}
@@ -189,12 +180,6 @@ ipc_output_set_client_tags(struct wl_client *client, struct wl_resource *resourc
 }
 
 void
-ipc_output_set_layout(struct wl_client *client, struct wl_resource *resource, uint32_t index)
-{
-   //
-}
-
-void
 ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint32_t tagmask, uint32_t toggle_tagset)
 {
 	struct simple_ipc_output *ipc_output;
@@ -203,8 +188,6 @@ ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint
 
 	ipc_output = wl_resource_get_user_data(resource);
 	if (!ipc_output) return;
-
-   say(INFO, "ipc_output_set_tags");
 
 	output = ipc_output->output;
 
