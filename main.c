@@ -49,6 +49,7 @@ spawn(char* cmd)
    if(!(sh=getenv("SHELL"))) sh = (char*)"/bin/sh";
 
    say(DEBUG, "Spawn %s", cmd);
+   /*
    pid_t pid = fork();
    if(pid==0){
       pid_t child;
@@ -63,6 +64,14 @@ spawn(char* cmd)
       exit(0);
    }
    //waitpid(pid, NULL, 0);
+   */
+   // from dwl:
+   if(fork()==0) {
+      dup2(STDERR_FILENO, STDOUT_FILENO);
+      setsid();
+      execl(sh, sh, "-c", cmd, (char*) NULL);
+      say(DEBUG, "execl %s failed", cmd);
+   }
 }
 
 void 
