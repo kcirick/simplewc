@@ -57,6 +57,9 @@ struct simple_config {
    char lock_cmd[64];
    char autostart_script[64];
 
+   char xkb_layout[32];
+   char xkb_options[32];
+
    struct wl_list key_bindings;
    struct wl_list mouse_bindings;
 };

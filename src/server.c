@@ -34,6 +34,7 @@
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
+#include <wlr/types/wlr_xdg_activation_v1.h>
 //
 //#include <wlr/types/wlr_foreign_toplevel_management_v1.h>
 
@@ -175,6 +176,7 @@ print_server_info()
          say(DEBUG, "    -> client tag = %u", client->tag);
          say(DEBUG, "    -> client fixed = %b", client->fixed);
          say(DEBUG, "    -> client visible = %b", client->visible);
+         say(DEBUG, "    -> client urgent = %b", client->urgent);
       }
    }
 }
@@ -282,6 +284,30 @@ set_gamma_notify(struct wl_listener *listener, void *data)
    struct simple_output *output = event->output->data;
    output->gamma_lut_changed = true;
    wlr_output_schedule_frame(output->wlr_output);
+}
+
+static void
+urgent_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "urgent_notify");
+
+   struct wlr_xdg_activation_v1_request_activate_event *event = data;
+   struct simple_client* client = NULL;
+   struct simple_layer_surface* lsurface = NULL; 
+   get_client_from_surface(event->surface, &client, &lsurface); 
+
+   struct simple_client* focused_client = get_top_client_from_output(g_server->cur_output, false);
+   if(!client || client == focused_client) return;
+
+   bool ismapped = false;
+   if(client->type==XWL_MANAGED_CLIENT || client->type==XWL_UNMANAGED_CLIENT)
+      ismapped = client->xwl_surface->surface->mapped;
+   else 
+      ismapped = client->xdg_surface->surface->mapped;
+
+   if(ismapped)
+      set_client_border_colour(client, URGENT);
+   client->urgent = true;
 }
 
 //--- Lock session notify functions --------------------------------------
@@ -636,8 +662,8 @@ prepareServer()
    wlr_fractional_scale_manager_v1_create(g_server->display, FRAC_SCALE_VERSION);
    
    // initialize interface used to implement urgency hints TODO
-   //g_server->xdg_activation = wlr_xdg_activation_v1_create(g_server->display);
-   //LISTEN();
+   g_server->xdg_activation = wlr_xdg_activation_v1_create(g_server->display);
+   LISTEN(&g_server->xdg_activation->events.request_activate, &g_server->request_activate, urgent_notify);
 
    // gamma control manager
    g_server->gamma_control_manager = wlr_gamma_control_manager_v1_create(g_server->display);

@@ -16,10 +16,14 @@ border_colour_fixed = #0000FF
 border_colour_outline = #FFFFFF
 
 #--- Command for locking -----
-lock_cmd = swaylock -c 000000
+#lock_cmd = swaylock -c 000000
 
 #--- Autostart script  -----
 #autostart = ~/.config/simplewc/autostart.sh 
+
+#--- XKB settings -----
+#xkb_layout = us
+#xkb_options = compose:ralt
 
 #--- Key Bindings -----
 KEY = A+q QUIT 0
@@ -54,6 +58,6 @@ KEY = W+S+Left Client tile_left
 KEY = W+S+Right Client tile_right
 
 #--- Mouse Bindings -----
-MOUSE = A+Button1 CLIENT move
-MOUSE = A+Button3 CLIENT resize
-MOUSE = Button1 ROOT test
+MOUSE = A+Button_Left CLIENT move
+MOUSE = A+Button_Right CLIENT resize
+MOUSE = Button_Left ROOT test

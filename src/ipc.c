@@ -127,8 +127,8 @@ ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
 				continue;
 			if (c == focused)
 				focused_client = 1;
-			//if (c->isurgent)
-			//	state |= ZDWL_IPC_OUTPUT_V2_TAG_STATE_URGENT;
+			if (c->urgent)
+				state |= ZDWL_IPC_OUTPUT_V2_TAG_STATE_URGENT;
 
 			numclients++;
 		}

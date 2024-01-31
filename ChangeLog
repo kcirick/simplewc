@@ -1,6 +1,15 @@
 TODO
 	* : Implement blur effect, maybe? 
-	* : Implement interface to activate urgency hints
+
+2024-01-31
+	* config.c: Added xkb_layout and xkb_options
+	* config.c: Bug fix. skip setting config_file_name when readConfiguration() is called from
+	reloadConfiguration()
+	* config/configrc: Fix buttons in mouse bindings (Button1 = Button_Left etc)
+	* server.c: Added interface to activate urgency hints
+	* ipc.c: Send tag flag with urgent clients
+	* client.c: Set initial client position based on the cursor position
+	* Makefile: Add install and uninstall scripts
 
 2024-01-19
 	* config.c: Remove unused config tag_names

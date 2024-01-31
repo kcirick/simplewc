@@ -32,6 +32,7 @@ struct simple_client {
 
    uint32_t tag;
    bool fixed;
+   bool urgent;
 
    bool visible;
 

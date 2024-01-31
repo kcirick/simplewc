@@ -1,3 +1,4 @@
+#include <string.h>
 #include <linux/input-event-codes.h>
 #include <wlr/backend.h>
 #include <wlr/backend/session.h>
@@ -422,6 +423,11 @@ new_input_notify(struct wl_listener *listener, void *data)
       input->keyboard = kb;
 
       struct xkb_rule_names rules = { 0 };
+      if(g_config->xkb_layout[0] != '\0')
+         rules.layout = g_config->xkb_layout;
+      if(g_config->xkb_options[0] != '\0')
+         rules.options = g_config->xkb_options;
+
       struct xkb_context *context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
       struct xkb_keymap *keymap = xkb_map_new_from_names(context, &rules, 
             XKB_KEYMAP_COMPILE_NO_FLAGS);

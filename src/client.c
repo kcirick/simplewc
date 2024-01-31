@@ -13,7 +13,6 @@
 #include "client.h"
 #include "server.h"
 
-
 static inline struct wlr_surface*
 get_client_surface(struct simple_client *client)
 {
@@ -427,6 +426,7 @@ focus_client(struct simple_client *client, bool raise)
    }
    
    client->visible = true;
+   client->urgent = false;
    set_client_activated(client, true);
    if(client->type != XWL_UNMANAGED_CLIENT)
       set_client_border_colour(client, FOCUSED);
@@ -444,11 +444,21 @@ set_initial_geometry(struct simple_client* client)
    if(wlr_box_empty(&client->geom))
       get_client_geometry(client, &client->geom);
 
+   // Set initial coord based on cursor position
+   client->geom.x = g_server->cursor->x;
+   client->geom.y = g_server->cursor->y;
+
    struct simple_output* output = g_server->cur_output;
    struct wlr_box bounds = output->usable_area;
 
+   // check the boundaries
    if(client->geom.x<bounds.x+g_config->border_width) client->geom.x=bounds.x + g_config->border_width;
    if(client->geom.y<bounds.y+g_config->border_width) client->geom.y=bounds.y + g_config->border_width;
+
+   if((client->geom.x+client->geom.width+g_config->border_width) > (bounds.x+bounds.width)) 
+      client->geom.x = bounds.x + bounds.width - client->geom.width - g_config->border_width;
+   if((client->geom.y+client->geom.height+g_config->border_width) > (bounds.y+bounds.height)) 
+      client->geom.y = bounds.y + bounds.height - client->geom.height - g_config->border_width;
 
    say(DEBUG, " -> Initial geometry : %d %d %d %d", client->geom.x, client->geom.y, client->geom.width, client->geom.height);
    // borders
@@ -492,6 +502,7 @@ map_notify(struct wl_listener *listener, void *data)
    client->tag = op->current_tag;
    client->visible = true;
    client->fixed = false;
+   client->urgent = false;
 
 #if XWAYLAND
    // Handle unmanaged clients first

@@ -65,13 +65,17 @@ set_defaults()
    colour2rgba("#FFFFFF", g_config->border_colour[OUTLINE]);
 
    g_config->autostart_script[0] = '\0';
+   g_config->lock_cmd[0] = '\0';
+   g_config->xkb_layout[0] = '\0';
+   g_config->xkb_options[0] = '\0';
 }
 
 void
 readConfiguration(char* filename) 
 {
    say(INFO, "Reading configuration file %s", filename);
-   strncpy(g_config->config_file_name, filename, sizeof g_config->config_file_name);
+   if(strcmp(g_config->config_file_name, filename))
+      strncpy(g_config->config_file_name, filename, sizeof g_config->config_file_name);
 
    set_defaults();
 
@@ -79,8 +83,8 @@ readConfiguration(char* filename)
    wl_list_init(&g_config->mouse_bindings);
 
    FILE *f;
-   if(!(f=fopen(filename, "r")))
-      say(ERROR, "Error reading file %s", filename);
+   if(!(f=fopen(g_config->config_file_name, "r")))
+      say(ERROR, "Error reading file %s", g_config->config_file_name);
 
    char buffer[128];
    char id[32];
@@ -117,6 +121,9 @@ readConfiguration(char* filename)
       if(!strcmp(id, "lock_cmd"))      strncpy(g_config->lock_cmd, value, sizeof g_config->lock_cmd);
 
       if(!strcmp(id, "autostart"))     strncpy(g_config->autostart_script, value, sizeof g_config->autostart_script);
+
+      if(!strcmp(id, "xkb_layout"))    strncpy(g_config->xkb_layout, value, sizeof g_config->xkb_layout);
+      if(!strcmp(id, "xkb_options"))   strncpy(g_config->xkb_options, value, sizeof g_config->xkb_options);
 
       if(!strcmp(id, "KEY")){
          char binding[32];
@@ -221,6 +228,7 @@ readConfiguration(char* filename)
          wl_list_insert(&g_config->mouse_bindings, &mousebind->link);
       }
    }
+   fclose(f);
 }
 
 void

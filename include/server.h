@@ -32,6 +32,9 @@ struct simple_server {
    struct wlr_xdg_decoration_manager_v1 *xdg_decoration_manager;
    struct wl_listener new_decoration;
 
+   struct wlr_xdg_activation_v1 *xdg_activation;
+   struct wl_listener request_activate;
+
    // clients and layers
    struct wl_list clients;
    struct wlr_xdg_shell *xdg_shell;

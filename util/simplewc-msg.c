@@ -113,13 +113,14 @@ simple_ipc_output_tag(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output,
       uint32_t tag, uint32_t state, uint32_t clients, uint32_t focused)
 {
    //say(INFO, "dwl_ipc_output_tag\n"); 
-   if(state == ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE) vis_tags |= 1 << tag;
+   if(state & ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE) vis_tags |= 1 << tag;
    if(focused) focused_tag = 1 << tag;
+   bool isurgent = state & ZDWL_IPC_OUTPUT_V2_TAG_STATE_URGENT; 
 
    if(!flag_tag) return;
 
    if(mode&GET) {
-      say(INFO, " |--> tag %u\n", tag);
+      say(INFO, " |--> tag %u %s\n", tag, isurgent ? "URG" : "");
       say(INFO, "   |--> active: %u / n clients = %u / focused client: %u\n", state, clients, focused);
    }
 }
