@@ -314,7 +314,8 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
          case WLR_XDG_SURFACE_ROLE_TOPLEVEL:
             //say(DEBUG, "XDG TOPLEVEL");
             *client = s->data;
-            type = (*client)->type;
+            if(*client)
+               type = (*client)->type;
             return type;
          case WLR_XDG_SURFACE_ROLE_NONE:
             return -1;

@@ -1,6 +1,9 @@
 TODO
 	* : Implement blur effect, maybe? 
 
+2024-02-01
+	* Makefile: clean up, make it easier to switch on/off XWAYLAND support
+
 2024-01-31
 	* config.c: Added xkb_layout and xkb_options
 	* config.c: Bug fix. skip setting config_file_name when readConfiguration() is called from

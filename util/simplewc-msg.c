@@ -83,7 +83,6 @@ static void simple_ipc_output_tag(void *, struct zdwl_ipc_output_v2 *, uint32_t,
 static void simple_ipc_output_title(void *, struct zdwl_ipc_output_v2 *, const char*);
 static void simple_ipc_output_appid(void *, struct zdwl_ipc_output_v2 *, const char*);
 static void simple_ipc_output_fullscreen(void *, struct zdwl_ipc_output_v2 *, uint32_t);
-static void simple_ipc_output_action(void *, struct zdwl_ipc_output_v2 *, const char*);
 static void simple_ipc_output_frame(void *, struct zdwl_ipc_output_v2 *);
 
 static const struct zdwl_ipc_output_v2_listener ipc_output_listener = {
@@ -104,7 +103,7 @@ simple_ipc_output_active(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, 
    //say(INFO, "dwl_ipc_output_active\n"); 
    if(!(mode&GET && flag_output)) return;
 
-   char* output_name = data;
+   //char* output_name = data;
    say(INFO, " |--> active = %u\n", active?1:0);
 }
 
@@ -150,12 +149,6 @@ simple_ipc_output_fullscreen(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_outp
    char* output_name = data;
    if(output_name) say(INFO, "%s ", output_name);
    printf("fullscreen %u\n", is_fullscreen);
-}
-
-void 
-simple_ipc_output_action(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, const char* action)
-{
-   say(INFO, "simple_ipc_output_action\n");
 }
 
 void

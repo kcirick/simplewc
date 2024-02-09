@@ -300,9 +300,11 @@ urgent_notify(struct wl_listener *listener, void *data)
    if(!client || client == focused_client) return;
 
    bool ismapped = false;
+#if XWAYLAND
    if(client->type==XWL_MANAGED_CLIENT || client->type==XWL_UNMANAGED_CLIENT)
       ismapped = client->xwl_surface->surface->mapped;
-   else 
+   else
+#endif
       ismapped = client->xdg_surface->surface->mapped;
 
    if(ismapped)
