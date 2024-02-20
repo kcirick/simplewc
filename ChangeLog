@@ -1,6 +1,10 @@
 TODO
 	* : Implement blur effect, maybe? 
 
+2024-02-20
+	* src/input.c: Enable tap to click for touchpad inputs
+	* Makefile: Add libinput to linked library
+
 2024-02-01
 	* Makefile: clean up, make it easier to switch on/off XWAYLAND support
 

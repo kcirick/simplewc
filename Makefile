@@ -8,8 +8,8 @@ USE_XWAYLAND = 1
 
 MY_CFLAGS = $(CFLAGS) -g -Wall -DVERSION=\"$(VERSION)\" -DWLR_USE_UNSTABLE \
    $(shell pkg-config --cflags wlroots)
-MY_LFLAGS = $(LDFLAGS) -lwayland-server -lxkbcommon\
-   $(shell pkg-config --libs wlroots)
+MY_LFLAGS = $(LDFLAGS) \
+   $(shell pkg-config --libs wlroots wayland-server libinput xkbcommon)
 ifeq ($(USE_XWAYLAND), 1)
 	MY_CFLAGS += -DXWAYLAND $(shell pkg-config --cflags xcb)
 	MY_LFLAGS += $(shell pkg-config --libs xcb)

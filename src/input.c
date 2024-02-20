@@ -2,6 +2,7 @@
 #include <linux/input-event-codes.h>
 #include <wlr/backend.h>
 #include <wlr/backend/session.h>
+#include <wlr/backend/libinput.h>
 #include <wlr/types/wlr_input_method_v2.h>
 #include <wlr/types/wlr_text_input_v3.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
@@ -415,6 +416,12 @@ new_input_notify(struct wl_listener *listener, void *data)
       say(DEBUG, "New Input: POINTER");
       input->type = INPUT_POINTER;
       wlr_cursor_attach_input_device(g_server->cursor, input->device);
+
+      struct libinput_device *libinput_device = wlr_libinput_get_device_handle(device);
+      if(libinput_device_config_tap_get_finger_count(libinput_device) > 0) {
+         // touchpad - enable tap click
+         libinput_device_config_tap_set_enabled(libinput_device, true);
+      }
 
    } else if (device->type == WLR_INPUT_DEVICE_KEYBOARD) {
       say(DEBUG, "New Input: KEYBOARD");

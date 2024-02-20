@@ -14,6 +14,11 @@ to teach myself the basics of window management. (formerly SimpleWay).
    - Text config file (default $HOME/.config/simplewc/configrc)
    - Simple tiling (manual left-right tiling or auto-tile like DWL/DWM)
    - simplewc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])
+ - Build dependencies:
+   - wlroots (>=0.17)
+   - libxkbcommon (usually a dependency of wlroots)
+   - libinput (usually a dependency of wlroots)
+   - xwayland (optional)
 
 [tinywl]: https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl
 [dwl]: https://codeberg.org/dwl/dwl
