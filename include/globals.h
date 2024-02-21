@@ -50,6 +50,7 @@ struct simple_config {
    int tile_gap_width;
    bool sloppy_focus;
    int moveresize_step;
+   bool touchpad_tap_click;
 
    float background_colour[4];
    float border_colour[NBORDERCOL][4];

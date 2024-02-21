@@ -3,6 +3,8 @@ TODO
 
 2024-02-20
 	* src/input.c: Enable tap to click for touchpad inputs
+	* src/config.c: Add config to enable tap to click
+	* config/configrc: Add config to enable tap to click (touchpad_tap_click)
 	* Makefile: Add libinput to linked library
 
 2024-02-01

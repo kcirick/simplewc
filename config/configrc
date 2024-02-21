@@ -6,6 +6,7 @@ border_width = 3
 tile_gap_width = 10
 sloppy_focus = false
 moveresize_step = 10
+touchpad_tap_click = false
 
 background_colour = #222222
 

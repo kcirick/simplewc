@@ -418,7 +418,7 @@ new_input_notify(struct wl_listener *listener, void *data)
       wlr_cursor_attach_input_device(g_server->cursor, input->device);
 
       struct libinput_device *libinput_device = wlr_libinput_get_device_handle(device);
-      if(libinput_device_config_tap_get_finger_count(libinput_device) > 0) {
+      if(libinput_device_config_tap_get_finger_count(libinput_device) > 0 && g_config->touchpad_tap_click) {
          // touchpad - enable tap click
          libinput_device_config_tap_set_enabled(libinput_device, true);
       }

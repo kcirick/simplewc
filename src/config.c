@@ -109,6 +109,7 @@ readConfiguration(char* filename)
       if(!strcmp(id, "tile_gap_width"))   g_config->tile_gap_width = atoi(value);
       if(!strcmp(id, "moveresize_step"))  g_config->moveresize_step = atoi(value);
       if(!strcmp(id, "sloppy_focus"))     g_config->sloppy_focus = !strcmp(value, "true") ? true : false; 
+      if(!strcmp(id, "touchpad_tap_click"))  g_config->touchpad_tap_click = !strcmp(value, "true") ? true : false; 
 
       if(!strcmp(id, "background_colour"))      colour2rgba(value, g_config->background_colour);
       if(!strcmp(id, "border_colour_focus"))    colour2rgba(value, g_config->border_colour[FOCUSED]);
