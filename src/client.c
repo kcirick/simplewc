@@ -240,7 +240,10 @@ get_client_at(double lx, double ly, struct simple_client **client, struct wlr_su
       this_client = pnode->data;
    }
 
-   if(!this_client) return -1;
+   if(!this_client){
+      *surface = scene_surface->surface;
+      return -1;
+   }
 
    if(this_client->type == LAYER_SHELL_CLIENT){
       *surface = scene_surface->surface;

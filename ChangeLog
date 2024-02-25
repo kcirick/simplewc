@@ -1,5 +1,9 @@
 TODO
-	* : Implement blur effect, maybe? 
+	* : Support multi-monitor setup
+
+2024-02-25
+	* src/input.c: Check input is libinput-compatible to prevent crash when nest-launching
+	* src/client.c: get_client_at returns surface when a popup oriainates from layer_shell 
 
 2024-02-20
 	* src/input.c: Enable tap to click for touchpad inputs

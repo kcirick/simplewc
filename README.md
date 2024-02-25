@@ -48,7 +48,7 @@ Still a work in progress, and not in a working state yet. Stay tuned...
 
 v0.1
 
-<a href="https://i.redd.it/mqvdzk97038c1.jpeg" target="_blank"><img src="https://i.redd.it/mqvdzk97038c1.jpeg" width="350" /></a>
+<a href="https://i.redd.it/b7wqm1au7adc1.png" target="_blank"><img src="https://i.redd.it/b7wqm1au7adc1.png" width="350" /></a>
 
 ## Version Log
 
