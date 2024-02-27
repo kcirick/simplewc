@@ -14,27 +14,52 @@ to teach myself the basics of window management. (formerly SimpleWay).
    - Text config file (default $HOME/.config/simplewc/configrc)
    - Simple tiling (manual left-right tiling or auto-tile like DWL/DWM)
    - simplewc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])
- - Build dependencies:
-   - wlroots (>=0.17)
-   - libxkbcommon (usually a dependency of wlroots)
-   - libinput (usually a dependency of wlroots)
-   - xwayland (optional)
 
 [tinywl]: https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl
 [dwl]: https://codeberg.org/dwl/dwl
 [labwc]: https://github.com/labwc/labwc
 [dwlmsg]: https://codeberg.org/notchoc/dwlmsg
 
-Usage:
 
-`> simplewc [--config file][--start cmd][--debug][--version][--help]`
+### Screenshots
 
-`> simplewc-msg --set [--tag .+-^][--client tag_n]`
+v0.1
 
-`> simplewc-msg (--get | --watch) [--output][--tag][--client (title | appid)]`
+<a href="https://i.redd.it/b7wqm1au7adc1.png" target="_blank"><img src="https://i.redd.it/b7wqm1au7adc1.png" width="450" /></a>
 
-`> simplewc-msg --action (quit | reconfig | lock)`
 
+### Usage
+
+    > simplewc [--config file][--start cmd][--debug][--version][--help]
+
+    > simplewc-msg --set [--tag .+-^][--client tag_n]
+                  (--get | --watch) [--output][--tag][--client (title | appid)]
+                   --action (quit | reconfig | lock)
+
+
+### Build
+
+    > meson setup [-Dxwayland=enabled|disabled] build
+    > ninja -C build || exit 1
+    > sudo ninja -C build install
+
+ - Build dependencies:
+   - wlroots (>=0.17)
+   - libxkbcommon (usually a dependency of wlroots)
+   - libinput (usually a dependency of wlroots)
+   - xwayland (optional)
+
+### Configuration
+
+Default configuration file read from `$HOME/.config/simplewc/configrc`, and allows users to customize:
+
+ - window management behaviour: ( # of tags, tile gaps, movement steps etc )
+ - window border width and colour
+ - lock command
+ - autostart script (e.g. set background, invoke status-bar, launch idle-inhibitor)
+ - keyboard layout and options 
+ - keybinds
+ - mouse binds 
 
 ## Status
 Please use [Github Issues Tracker][ghit] to report bugs and issues.
@@ -43,12 +68,6 @@ Still a work in progress, and not in a working state yet. Stay tuned...
 
 [ghit]: https://github.com/kcirick/simplewc/issues
 
-
-## Screenshots
-
-v0.1
-
-<a href="https://i.redd.it/b7wqm1au7adc1.png" target="_blank"><img src="https://i.redd.it/b7wqm1au7adc1.png" width="350" /></a>
 
 ## Version Log
 
