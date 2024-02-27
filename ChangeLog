@@ -1,6 +1,9 @@
 TODO
 	* : Support multi-monitor setup
 
+2024-02-27
+	* meson.build: Adding support for meson/ninja building
+
 2024-02-25
 	* src/input.c: Check input is libinput-compatible to prevent crash when nest-launching
 	* src/client.c: get_client_at returns surface when a popup oriainates from layer_shell 
