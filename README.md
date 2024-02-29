@@ -32,9 +32,9 @@ v0.1
 
     > simplewc [--config file][--start cmd][--debug][--version][--help]
 
-    > simplewc-msg --set [--tag .+-^][--client tag_n]
-                  (--get | --watch) [--output][--tag][--client (title | appid)]
-                   --action (quit | reconfig | lock)
+    > simplewc-msg --set [--tag .+-^][--client tag_n][--output (on|off)]
+                  (--get|--watch) [--output][--tag][--client (title|appid)]
+                   --action (quit|reconfig|lock)
 
 
 ### Build

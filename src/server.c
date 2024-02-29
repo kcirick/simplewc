@@ -226,6 +226,20 @@ arrange_output(struct simple_output* output)
 }
 
 //--- Other notify functions ---------------------------------------------
+void
+set_output_state(bool state)
+{
+   struct simple_output *output;
+   wl_list_for_each(output, &g_server->outputs, link) {
+      if(!output) continue;
+
+      wlr_output_enable(output->wlr_output, state);
+      if(state && !wlr_output_test(output->wlr_output))
+         wlr_output_rollback(output->wlr_output);
+      wlr_output_commit(output->wlr_output);
+   }
+}
+
 static void
 new_decoration_notify(struct wl_listener *listener, void *data)
 {

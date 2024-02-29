@@ -164,4 +164,6 @@ void prepareServer();
 void startServer(char*);
 void cleanupServer();
 
+void set_output_state(bool);
+
 #endif

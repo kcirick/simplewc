@@ -156,6 +156,16 @@ simple_ipc_output_frame(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output)
 {
    if(mode!=SET) return;
 
+   if(flag_output) {
+      char new_arg[16];
+      strcpy(new_arg, "output_");
+      strcat(new_arg, arg);
+      say(INFO, "new_arg = %s\n", new_arg);
+      zdwl_ipc_manager_v2_send_action(ipc_manager, new_arg);
+
+      wl_display_flush(display);
+      return;
+   }
    if(flag_client) {
       uint32_t new_tag = (1<<(atoi(arg)-1));
       zdwl_ipc_output_v2_set_client_tags(dwl_ipc_output, ~focused_tag, new_tag);
@@ -288,6 +298,10 @@ main(int argc, char **argv)
          }
          if(!strcmp(iarg, "--tag") && ((i+1)<argc)){
             flag_tag = true;
+            sprintf(arg, argv[++i]);
+         }
+         if(!strcmp(iarg, "--output") && ((i+1)<argc)){
+            flag_output = true;
             sprintf(arg, argv[++i]);
          }
       } else if(mode==GET || mode==WATCH) {
