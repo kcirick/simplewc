@@ -233,10 +233,11 @@ set_output_state(bool state)
    wl_list_for_each(output, &g_server->outputs, link) {
       if(!output) continue;
 
-      wlr_output_enable(output->wlr_output, state);
-      if(state && !wlr_output_test(output->wlr_output))
-         wlr_output_rollback(output->wlr_output);
-      wlr_output_commit(output->wlr_output);
+      struct wlr_output_state wlr_state = {0};
+
+      wlr_output_state_set_enabled(&wlr_state, 
+            state ? ZWLR_OUTPUT_POWER_V1_MODE_ON : ZWLR_OUTPUT_POWER_V1_MODE_OFF);
+      wlr_output_commit_state(output->wlr_output, &wlr_state);
    }
 }
 
@@ -245,6 +246,7 @@ new_decoration_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "new_decoration_notify");
    struct wlr_xdg_toplevel_decoration_v1 *decoration = data;
+
    wlr_xdg_toplevel_decoration_v1_set_mode(decoration, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 }
 
@@ -270,23 +272,14 @@ output_pm_set_mode_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "output_pm_set_mode_notify");
    struct wlr_output_power_v1_set_mode_event *event = data;
+   struct wlr_output_state wlr_state = {0};
 
-   switch (event->mode) {
-      case ZWLR_OUTPUT_POWER_V1_MODE_OFF:
-         wlr_output_enable(event->output, false);
-         wlr_output_commit(event->output);
-         break;
-      case ZWLR_OUTPUT_POWER_V1_MODE_ON:
-         wlr_output_enable(event->output, true);
-         if(!wlr_output_test(event->output))
-            wlr_output_rollback(event->output);
-         wlr_output_commit(event->output);
+   wlr_output_state_set_enabled(&wlr_state, event->mode);
+   wlr_output_commit_state(event->output, &wlr_state);
 
-         // reset the cursor image
-         wlr_cursor_unset_image(g_server->cursor);
-         wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");;
-         break;
-   }
+   // reset the cursor image
+   wlr_cursor_unset_image(g_server->cursor);
+   wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");;
 }
 
 static void
@@ -633,10 +626,10 @@ prepareServer()
 {
    say(INFO, "Preparing Wayland server");
    
-   if(!(g_server->display = wl_display_create()))
-      say(ERROR, "Unable to create Wayland display!");
+   g_server->display = wl_display_create();
+   g_server->event_loop = wl_display_get_event_loop(g_server->display);
 
-   if(!(g_server->backend = wlr_backend_autocreate(g_server->display, &g_session)))
+   if(!(g_server->backend = wlr_backend_autocreate(g_server->event_loop, &g_session)))
       say(ERROR, "Unable to create wlr_backend!");
 
    // create a scene graph used to lay out windows
@@ -687,7 +680,7 @@ prepareServer()
 
    // create an output layout, i.e. wlroots utility for working with an arrangement of 
    // screens in a physical layout
-   g_server->output_layout = wlr_output_layout_create();
+   g_server->output_layout = wlr_output_layout_create(g_server->display);
    LISTEN(&g_server->output_layout->events.change, &g_server->output_layout_change, output_layout_change_notify);
 
    wl_list_init(&g_server->outputs);   
@@ -712,7 +705,8 @@ prepareServer()
    
    if(!(g_server->xdg_shell = wlr_xdg_shell_create(g_server->display, XDG_SHELL_VERSION)))
       say(ERROR, "unable to create XDG shell interface");
-   LISTEN(&g_server->xdg_shell->events.new_surface, &g_server->xdg_new_surface, xdg_new_surface_notify);
+   LISTEN(&g_server->xdg_shell->events.new_toplevel, &g_server->xdg_new_toplevel, xdg_new_toplevel_notify);
+   LISTEN(&g_server->xdg_shell->events.new_popup, &g_server->xdg_new_popup, xdg_new_popup_notify);
 
    g_server->layer_shell = wlr_layer_shell_v1_create(g_server->display, LAYER_SHELL_VERSION);
    LISTEN(&g_server->layer_shell->events.new_surface, &g_server->layer_new_surface, layer_new_surface_notify);
@@ -745,8 +739,7 @@ prepareServer()
    g_server->xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(g_server->display);
    LISTEN(&g_server->xdg_decoration_manager->events.new_toplevel_decoration, &g_server->new_decoration, new_decoration_notify);
 
-   struct wlr_presentation *presentation = wlr_presentation_create(g_server->display, g_server->backend);
-   wlr_scene_set_presentation(g_server->scene, presentation);
+   wlr_presentation_create(g_server->display, g_server->backend);
 
    // Set up IPC interface
    wl_global_create(g_server->display, &zdwl_ipc_manager_v2_interface, DWL_IPC_VERSION, NULL, ipc_manager_bind);

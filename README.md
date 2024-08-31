@@ -44,7 +44,7 @@ v0.1
     > sudo ninja -C build install
 
  - Build dependencies:
-   - wlroots (>=0.17)
+   - wlroots-0.18
    - libxkbcommon (usually a dependency of wlroots)
    - libinput (usually a dependency of wlroots)
    - xwayland (optional)
@@ -71,7 +71,10 @@ Still a work in progress, and not in a working state yet. Stay tuned...
 
 ## Version Log
 
-  - 0.2 (Work in progress)
+  - 0.3 (Work in progress)
+    - Goal: Continue to improve the compositor
+    - Uses wlroots v0.18
+  - 0.2 (2024-08-29) ([download][v02])
     - Goal: add in additional features
     - Uses wlroots v0.17
     - Added visibility toggle (a.k.a. iconify) and maximize functionality
@@ -87,3 +90,4 @@ Still a work in progress, and not in a working state yet. Stay tuned...
     - Uses wlroots v0.17
 
 [v01]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.1.tar.gz
+[v02]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.2.tar.gz

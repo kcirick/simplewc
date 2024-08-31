@@ -319,7 +319,7 @@ cursor_axis_notify(struct wl_listener *listener, void *data)
    struct wlr_pointer_axis_event *event = data;
 
    wlr_idle_notifier_v1_notify_activity(g_server->idle_notifier, g_server->seat);
-   wlr_seat_pointer_notify_axis(g_server->seat, event->time_msec, event->orientation, event->delta, event->delta_discrete, event->source);
+   wlr_seat_pointer_notify_axis(g_server->seat, event->time_msec, event->orientation, event->delta, event->delta_discrete, event->source, event->relative_direction);
 }
 
 static void 

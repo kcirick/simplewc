@@ -8,6 +8,7 @@
 
 struct simple_server {
    struct wl_display *display;
+   struct wl_event_loop *event_loop;
 
    struct wlr_backend *backend;
    struct wlr_renderer *renderer;
@@ -38,7 +39,8 @@ struct simple_server {
    // clients and layers
    struct wl_list clients;
    struct wlr_xdg_shell *xdg_shell;
-   struct wl_listener xdg_new_surface;
+   struct wl_listener xdg_new_toplevel;
+   struct wl_listener xdg_new_popup;
 #if XWAYLAND
    struct wlr_xwayland *xwayland;
    struct wl_listener xwl_new_surface;

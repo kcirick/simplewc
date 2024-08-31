@@ -568,12 +568,24 @@ unmap_notify(struct wl_listener *listener, void *data)
       wlr_scene_node_destroy(&client->scene_tree->node);
 }
 
+static void
+commit_notify(struct wl_listener *listener, void *data)
+{
+   struct simple_client *client = wl_container_of(listener, client, commit);
+
+   if(client->xdg_surface->initial_commit){
+      wlr_xdg_toplevel_set_wm_capabilities(client->xdg_surface->toplevel, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN);
+      wlr_xdg_toplevel_set_size(client->xdg_surface->toplevel, 0, 0);
+      return;
+   }
+}
+
 static void 
 destroy_notify(struct wl_listener *listener, void *data) 
 {
    say(DEBUG, "client_destroy_notify");
    struct simple_client *client = wl_container_of(listener, client, destroy);
-   struct simple_output * output = g_server->cur_output;
+//   struct simple_output * output = g_server->cur_output;
 
    wl_list_remove(&client->destroy.link);
    if(client->type==XDG_SHELL_CLIENT){
@@ -589,45 +601,62 @@ destroy_notify(struct wl_listener *listener, void *data)
    }
    free(client);
 
-   focus_client(get_top_client_from_output(output, false), true);
+   //focus_client(get_top_client_from_output(output, false), true);
+}
+
+static void
+popup_commit_notify(struct wl_listener *listener, void *data)
+{
+   struct wlr_surface *surface = data;
+   struct wlr_xdg_popup *popup = wlr_xdg_popup_try_from_wlr_surface(surface);
+
+   struct simple_client* client = NULL;
+   struct simple_layer_surface *lsurface = NULL;
+
+   struct wlr_box box;
+
+   if (!popup->base->initial_commit) return;
+
+   int type = get_client_from_surface(popup->base->surface, &client, &lsurface);
+   if(!popup->parent || type<0) return;
+
+   struct wlr_scene_tree *tree = wlr_scene_xdg_surface_create(popup->parent->data, popup->base);
+   popup->base->surface->data = tree;
+   box = type == LAYER_SHELL_CLIENT ? lsurface->output->usable_area : client->output->usable_area;
+   box.x -= (type==LAYER_SHELL_CLIENT ? lsurface->geom.x : client->geom.x); 
+   box.y -= (type==LAYER_SHELL_CLIENT ? lsurface->geom.y : client->geom.y);
+   wlr_xdg_popup_unconstrain_from_box(popup, &box);
+
+   wl_list_remove(&listener->link);
 }
 
 // --- XDG Shell ---------------------------------------------------------
 void 
-xdg_new_surface_notify(struct wl_listener *listener, void *data)
+xdg_new_toplevel_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "new_xdg_surface_notify");
-   struct wlr_xdg_surface *xdg_surface = data;
-   struct simple_client* pclient;
-   struct simple_layer_surface* lsurface;
-
-   // add xdg popups to the scene graph
-   if(xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
-      
-      struct wlr_box box;
-      int type = get_client_from_surface(xdg_surface->surface, &pclient, &lsurface);
-      if(!xdg_surface->popup->parent || type<0)
-         return;
-      struct wlr_scene_tree *tree = wlr_scene_xdg_surface_create(xdg_surface->popup->parent->data, xdg_surface);
-      xdg_surface->surface->data = tree;
-      box = type == LAYER_SHELL_CLIENT ? lsurface->output->usable_area : pclient->output->usable_area;
-      box.x -= (type==LAYER_SHELL_CLIENT ? lsurface->geom.x : pclient->geom.x); 
-      box.y -= (type==LAYER_SHELL_CLIENT ? lsurface->geom.y : pclient->geom.y);
-      wlr_xdg_popup_unconstrain_from_box(xdg_surface->popup, &box);
-      
-      return;
-   }
-   assert(xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL);
+   struct wlr_xdg_toplevel *xdg_toplevel = data;
 
    // allocate a simple_client for this surface
    struct simple_client *xdg_client = calloc(1, sizeof(struct simple_client));
    xdg_client->type = XDG_SHELL_CLIENT;
-   xdg_client->xdg_surface = xdg_surface;
+   xdg_client->xdg_surface = xdg_toplevel->base;
 
-   LISTEN(&xdg_surface->surface->events.destroy, &xdg_client->destroy, destroy_notify);
-   LISTEN(&xdg_surface->surface->events.map, &xdg_client->map, map_notify);
-   LISTEN(&xdg_surface->surface->events.unmap, &xdg_client->unmap, unmap_notify);
-   //LISTEN(&xdg_surface->surface->events.commit, &xdg_client->commit, commit_notify);
+   LISTEN(&xdg_toplevel->events.destroy, &xdg_client->destroy, destroy_notify);
+   LISTEN(&xdg_toplevel->base->surface->events.map, &xdg_client->map, map_notify);
+   LISTEN(&xdg_toplevel->base->surface->events.unmap, &xdg_client->unmap, unmap_notify);
+   LISTEN(&xdg_toplevel->base->surface->events.commit, &xdg_client->commit, commit_notify);
+}
+
+static struct wl_listener popup_commit_listener;
+
+void
+xdg_new_popup_notify(struct wl_listener *listener, void *data)
+{
+   //void
+   struct wlr_xdg_popup *xdg_popup = data;
+
+   LISTEN(&xdg_popup->base->surface->events.commit, &popup_commit_listener, &popup_commit_notify);
 }
 
 //---- XWayland Shell ----------------------------------------------------

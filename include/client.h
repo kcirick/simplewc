@@ -14,10 +14,14 @@ struct simple_client {
    struct wlr_scene_tree *scene_surface_tree;
    struct wlr_scene_rect *border[4]; // top, bottom, left, right
 
+   struct wlr_xdg_toplevel_decoration_v1 *decoration;
+
    struct wl_listener map;
    struct wl_listener unmap;
    struct wl_listener destroy;
    struct wl_listener commit;
+//   struct wl_listener decoration_mode;
+//   struct wl_listener decoration_destroy;
 
 #if XWAYLAND
    struct wl_listener associate;
@@ -61,7 +65,8 @@ void get_client_geometry(struct simple_client*, struct wlr_box*);
 void set_client_geometry(struct simple_client*, bool);
 void set_client_border_colour(struct simple_client*, int);
 
-void xdg_new_surface_notify(struct wl_listener*, void*);
+void xdg_new_toplevel_notify(struct wl_listener*, void*);
+void xdg_new_popup_notify(struct wl_listener*, void*);
 
 void xwl_new_surface_notify(struct wl_listener*, void *);
 void xwl_ready_notify(struct wl_listener*, void *);

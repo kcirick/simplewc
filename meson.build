@@ -2,7 +2,7 @@
 project (
   'simplewc',
   'c', 
-  version: '0.2',
+  version: '0.3',
   license: 'MIT',
   meson_version: '>=0.59.0',
 )
@@ -15,7 +15,7 @@ add_project_arguments(
 )
 
 #--- dependencies
-wlroots = dependency('wlroots', version: ['>=0.17.0', '<0.18.0'])
+wlroots = dependency('wlroots-0.18', version: ['>=0.18.0', '<0.19.0'])
 wayland_server = dependency('wayland-server', version: '>=1.19.0')
 wayland_client = dependency('wayland-client', version: '>=1.19.0')
 wayland_proto = dependency('wayland-protocols')

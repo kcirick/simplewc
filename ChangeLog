@@ -4,6 +4,15 @@ TODO
 	* src/server.c: Adding internal function to turn output on/off
 	* util/simplewc-msg.c: turn output on/off by `simplewc-msg --set --output (on|off)`
 
+2024-08-31
+	* : Moving onto v0.3, upgrade to wlroots-0.18
+	* README.md: Update for v0.3
+	* src/client.c: add commit_notify and popup_commit_notify. xdg_new_surface_notify is split into
+	xdg_new_toplevel_notify and xdg_new_popup_notify as per wlroots-0.18
+	specification
+	* src/server.c: Changes to output_state and pm_set_mode functions to align
+	with wlroots-0.18 changes
+
 2024-02-27
 	* meson.build: Adding support for meson/ninja building
 
