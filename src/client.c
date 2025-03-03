@@ -429,6 +429,10 @@ focus_client(struct simple_client *client, bool raise)
       }
    }
    
+   // update the output
+   client->output = get_output_at(g_server->cursor->x, g_server->cursor->y);
+   g_server->cur_output = client->output;
+   
    client->visible = true;
    client->urgent = false;
    set_client_activated(client, true);

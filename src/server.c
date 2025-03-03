@@ -152,8 +152,16 @@ tileTag()
 struct simple_output*
 get_output_at(double x, double y)
 {
-   struct wlr_output *output = wlr_output_layout_output_at(g_server->output_layout, x, y);
-   return output ? output->data : NULL;
+   double closest_x, closest_y;
+   wlr_output_layout_closest_point(g_server->output_layout, NULL, x, y, 
+         &closest_x, &closest_y);
+   struct wlr_output *output = wlr_output_layout_output_at(g_server->output_layout, closest_x, closest_y);
+
+   struct simple_output* test_output;
+   wl_list_for_each(test_output, &g_server->outputs, link) {
+      if(output->data == test_output) return test_output;
+   }
+   return NULL;
 }
 
 void

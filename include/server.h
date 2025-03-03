@@ -157,6 +157,8 @@ struct simple_session_lock {
 struct client_outline* client_outline_create(struct wlr_scene_tree*, float*, int);
 void client_outline_set_size(struct client_outline*, int, int);
 
+struct simple_output* get_output_at(double, double);
+
 void print_server_info();
 void setCurrentTag(int, bool);
 void tileTag();

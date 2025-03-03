@@ -8,7 +8,8 @@ project (
 )
 
 add_project_arguments(
-  [ '-DWLR_USE_UNSTABLE', 
+  [ '-ggdb',
+    '-DWLR_USE_UNSTABLE', 
     '-DVERSION="@0@"'.format(meson.project_version())
   ],
   language: 'c'

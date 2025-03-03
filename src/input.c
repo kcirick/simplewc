@@ -102,7 +102,15 @@ kb_key_notify(struct wl_listener *listener, void *data)
       }
    }
 
-   if(!handled) {
+   if(event->state == WL_KEYBOARD_KEY_STATE_RELEASED) {
+      if(g_server->seat->keyboard_state.focused_surface){
+         wlr_seat_set_keyboard(g_server->seat, keyboard->keyboard);
+         wlr_seat_keyboard_notify_key(g_server->seat, event->time_msec, event->keycode, event->state);
+         handled=true; 
+      }
+   }
+
+   if(!handled && event->state != WL_KEYBOARD_KEY_STATE_RELEASED) {
       wlr_seat_set_keyboard(g_server->seat, keyboard->keyboard);
       wlr_seat_keyboard_notify_key(g_server->seat, event->time_msec, event->keycode, event->state);
    }
