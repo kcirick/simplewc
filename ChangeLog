@@ -1,7 +1,13 @@
 TODO
 	* : Support multi-monitor setup
-2024-02-28
-	* src/server.c: Adding internal function to turn output on/off
+	* : Improve simplewc-msg functionality
+
+v0.2 -> v0.3 Changes
+	* main.c: Use getopt_long for command line arguments. keep track of startup
+	pid and kill upon exit
+	* src/output.c, include/output.h: Splitting output code from server code
+	* src/layer.c: better support for multihead
+	* src/output.c: Adding internal function to turn output on/off
 	* util/simplewc-msg.c: turn output on/off by `simplewc-msg --set --output (on|off)`
 
 2024-08-31

@@ -11,7 +11,6 @@
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
-#include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_output_power_management_v1.h>
@@ -42,6 +41,7 @@
 #include "globals.h"
 #include "layer.h"
 #include "client.h"
+#include "output.h"
 #include "server.h"
 #include "input.h"
 #include "ipc.h"
@@ -108,6 +108,7 @@ setCurrentTag(int tag, bool toggle)
 void
 tileTag() 
 {
+   // TODO: Needs to tile per output
    struct simple_client* client;
    struct simple_output* output = g_server->cur_output;
    
@@ -147,21 +148,6 @@ tileTag()
       i++;
    }
    //arrange_output(output);
-}
-
-struct simple_output*
-get_output_at(double x, double y)
-{
-   double closest_x, closest_y;
-   wlr_output_layout_closest_point(g_server->output_layout, NULL, x, y, 
-         &closest_x, &closest_y);
-   struct wlr_output *output = wlr_output_layout_output_at(g_server->output_layout, closest_x, closest_y);
-
-   struct simple_output* test_output;
-   wl_list_for_each(test_output, &g_server->outputs, link) {
-      if(output->data == test_output) return test_output;
-   }
-   return NULL;
 }
 
 void
@@ -208,47 +194,7 @@ check_idle_inhibitor()
    wlr_idle_notifier_v1_set_inhibited(g_server->idle_notifier, inhibited);
 }
 
-void
-arrange_output(struct simple_output* output)
-{
-   say(DEBUG, "arrange_output");
-   struct simple_client* client, *focused_client=NULL;
-
-   get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
-   
-   int n=0;
-   wl_list_for_each(client, &g_server->clients, link) {
-      if(client->visible && VISIBLEON(client, output)) n++;
-      set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
-      wlr_scene_node_set_enabled(&client->scene_tree->node, client->visible && VISIBLEON(client, output));
-   }
-
-   if(n>0){
-      if(!focused_client)
-         focused_client = get_top_client_from_output(output, false);
-      focus_client(focused_client, true);
-   } else
-      input_focus_surface(NULL);
-
-   check_idle_inhibitor();
-}
-
 //--- Other notify functions ---------------------------------------------
-void
-set_output_state(bool state)
-{
-   struct simple_output *output;
-   wl_list_for_each(output, &g_server->outputs, link) {
-      if(!output) continue;
-
-      struct wlr_output_state wlr_state = {0};
-
-      wlr_output_state_set_enabled(&wlr_state, 
-            state ? ZWLR_OUTPUT_POWER_V1_MODE_ON : ZWLR_OUTPUT_POWER_V1_MODE_OFF);
-      wlr_output_commit_state(output->wlr_output, &wlr_state);
-   }
-}
-
 static void
 new_decoration_notify(struct wl_listener *listener, void *data)
 {
@@ -435,45 +381,6 @@ new_lock_session_manager_notify(struct wl_listener *listener, void *data)
    wlr_session_lock_v1_send_locked(session_lock);
 }
 
-//--- Output notify functions --------------------------------------------
-static void 
-output_layout_change_notify(struct wl_listener *listener, void *data) 
-{
-   say(DEBUG, "output_layout_change_notify");
-
-   struct wlr_output_configuration_v1 *config = wlr_output_configuration_v1_create();
-   struct wlr_output_configuration_head_v1 *config_head;
-   if(!config)
-      say(ERROR, "wlr_output_configuration_v1_create failed");
-
-   struct simple_output *output;
-   wl_list_for_each(output, &g_server->outputs, link) {
-      if(!output->wlr_output->enabled) continue;
-
-      config_head = wlr_output_configuration_head_v1_create(config, output->wlr_output);
-      if(!config_head) {
-         wlr_output_configuration_v1_destroy(config);
-         say(ERROR, "wlr_output_configuration_head_v1_create failed");
-      }
-      struct wlr_box box;
-      wlr_output_layout_get_box(g_server->output_layout, output->wlr_output, &box);
-      if(wlr_box_empty(&box))
-         say(ERROR, "Failed to get output layout box");
-
-      memset(&output->usable_area, 0, sizeof(output->usable_area));
-      output->usable_area = box;
-
-      output->gamma_lut_changed = true;
-      config_head->state.x = box.x;
-      config_head->state.y = box.y;
-   }
-
-   if(config)
-      wlr_output_manager_v1_set_configuration(g_server->output_manager, config);
-   else
-      say(ERROR, "wlr_output_manager_v1_set_configuration failed");
-}
-
 static void 
 output_manager_apply_notify(struct wl_listener *listener, void *data) 
 {
@@ -486,146 +393,6 @@ output_manager_test_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "output_manager_test_notify");
    //
-}
-
-static void 
-output_frame_notify(struct wl_listener *listener, void *data) 
-{
-   //say(DEBUG, "output_frame_notify");
-   struct simple_output *output = wl_container_of(listener, output, frame);
-   struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(g_server->scene, output->wlr_output);
-   
-   struct wlr_gamma_control_v1 *gamma_control;
-   struct wlr_output_state pending = {0};
-   if (output->gamma_lut_changed) {
-      say(DEBUG, "gamma_lut_changed true");
-      gamma_control = wlr_gamma_control_manager_v1_get_control(g_server->gamma_control_manager, output->wlr_output);
-      output->gamma_lut_changed = false;
-
-      if(!wlr_gamma_control_v1_apply(gamma_control, &pending))
-         wlr_scene_output_commit(scene_output, NULL);
-
-      if(!wlr_output_test_state(output->wlr_output, &pending)) {
-         wlr_gamma_control_v1_send_failed_and_destroy(gamma_control);
-         wlr_scene_output_commit(scene_output, NULL);
-      }
-      wlr_output_commit_state(output->wlr_output, &pending);
-      wlr_output_schedule_frame(output->wlr_output);
-   } else {
-      // Render the scene if needed and commit the output 
-      wlr_scene_output_commit(scene_output, NULL);
-   }
-   
-   struct timespec now;
-   clock_gettime(CLOCK_MONOTONIC, &now);
-   wlr_scene_output_send_frame_done(scene_output, &now);
-}
-
-static void 
-output_request_state_notify(struct wl_listener *listener, void *data) 
-{
-   say(DEBUG, "output_request_state_notify");
-   // called when the backend requests a new state for the output
-   struct simple_output *output = wl_container_of(listener, output, request_state);
-   const struct wlr_output_event_request_state *event = data;
-   wlr_output_commit_state(output->wlr_output, event->state);
-}
-
-static void 
-output_destroy_notify(struct wl_listener *listener, void *data) 
-{
-   say(DEBUG, "output_destroy_notify");
-   struct simple_output *output = wl_container_of(listener, output, destroy);
-
-   struct simple_ipc_output *ipc_output, *ipc_output_tmp;
-   wl_list_for_each_safe(ipc_output, ipc_output_tmp, &output->ipc_outputs, link)
-      wl_resource_destroy(ipc_output->resource);
-
-   wl_list_remove(&output->frame.link);
-   wl_list_remove(&output->request_state.link);
-   wl_list_remove(&output->destroy.link);
-   wl_list_remove(&output->link);
-   free(output);
-}
-
-//------------------------------------------------------------------------
-static void 
-new_output_notify(struct wl_listener *listener, void *data) 
-{
-   say(DEBUG, "new_output_notify");
-   struct wlr_output *wlr_output = data;
-
-   // Don't configure any non-desktop displays, such as VR headsets
-   if(wlr_output->non_desktop) {
-      say(DEBUG, "Not configuring non-desktop output");
-      return;
-   }
-
-   // Configures the output created by the backend to use the allocator and renderer
-   // Must be done once, before committing the output
-   if(!wlr_output_init_render(wlr_output, g_server->allocator, g_server->renderer))
-      say(ERROR, "unable to initialize output renderer");
-   
-   // The output may be disabled. Switch it on
-   struct wlr_output_state state;
-   wlr_output_state_init(&state);
-   wlr_output_state_set_enabled(&state, true);
-
-   struct wlr_output_mode *mode = wlr_output_preferred_mode(wlr_output);
-   if (mode)
-      wlr_output_state_set_mode(&state, mode);
-
-   wlr_output_commit_state(wlr_output, &state);
-   wlr_output_state_finish(&state);
-
-   struct simple_output *output = calloc(1, sizeof(struct simple_output));
-   output->wlr_output = wlr_output;
-   wlr_output->data = output;
-
-   wl_list_init(&output->ipc_outputs);   // ipc addition
-
-   LISTEN(&wlr_output->events.frame, &output->frame, output_frame_notify);
-   LISTEN(&wlr_output->events.destroy, &output->destroy, output_destroy_notify);
-   LISTEN(&wlr_output->events.request_state, &output->request_state, output_request_state_notify);
-
-   wl_list_insert(&g_server->outputs, &output->link);
-
-   for(int i=0; i<N_LAYER_SHELL_LAYERS; i++)
-      wl_list_init(&output->layer_shells[i]);
-   
-   wlr_scene_node_lower_to_bottom(&g_server->layer_tree[LyrBottom]->node);
-   wlr_scene_node_lower_to_bottom(&g_server->layer_tree[LyrBg]->node);
-   wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrTop]->node);
-   wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrOverlay]->node);
-   wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrLock]->node);
-
-   //set default tag
-   output->current_tag = TAGMASK(0);
-   output->visible_tags = TAGMASK(0);
-
-   struct wlr_output_layout_output *l_output =
-      wlr_output_layout_add_auto(g_server->output_layout, wlr_output);
-   struct wlr_scene_output *scene_output =
-      wlr_scene_output_create(g_server->scene, wlr_output);
-   wlr_scene_output_layout_add_output(g_server->scene_output_layout, l_output, scene_output);
-
-   // update background and lock geometry
-   struct wlr_box geom;
-   wlr_output_layout_get_box(g_server->output_layout, NULL, &geom);
-
-   memset(&output->full_area, 0, sizeof(output->full_area));
-   output->full_area = geom;
-   
-   wlr_scene_node_set_position(&g_server->root_bg->node, geom.x, geom.y);
-   wlr_scene_rect_set_size(g_server->root_bg, geom.width, geom.height);
-   wlr_scene_node_set_position(&g_server->locked_bg->node, geom.x, geom.y);
-   wlr_scene_rect_set_size(g_server->locked_bg, geom.width, geom.height);
-
-   wlr_scene_node_set_enabled(&g_server->root_bg->node, 1);
-
-   say(INFO, " -> Output %s : %dx%d+%d+%d", l_output->output->name,
-         l_output->output->width, l_output->output->height, 
-         l_output->x, l_output->y);
 }
 
 //------------------------------------------------------------------------
@@ -677,6 +444,7 @@ prepareServer()
    wlr_single_pixel_buffer_manager_v1_create(g_server->display);
    wlr_primary_selection_v1_device_manager_create(g_server->display);
    wlr_fractional_scale_manager_v1_create(g_server->display, FRAC_SCALE_VERSION);
+   wlr_presentation_create(g_server->display, g_server->backend);
    
    // initialize interface used to implement urgency hints TODO
    g_server->xdg_activation = wlr_xdg_activation_v1_create(g_server->display);
@@ -690,13 +458,13 @@ prepareServer()
    // screens in a physical layout
    g_server->output_layout = wlr_output_layout_create(g_server->display);
    LISTEN(&g_server->output_layout->events.change, &g_server->output_layout_change, output_layout_change_notify);
+   wlr_xdg_output_manager_v1_create(g_server->display, g_server->output_layout);
 
    wl_list_init(&g_server->outputs);   
    LISTEN(&g_server->backend->events.new_output, &g_server->new_output, new_output_notify);
 
    g_server->scene_output_layout = wlr_scene_attach_output_layout(g_server->scene, g_server->output_layout);
 
-   wlr_xdg_output_manager_v1_create(g_server->display, g_server->output_layout);
    g_server->output_manager = wlr_output_manager_v1_create(g_server->display);
    LISTEN(&g_server->output_manager->events.apply, &g_server->output_manager_apply, output_manager_apply_notify);
    LISTEN(&g_server->output_manager->events.test, &g_server->output_manager_test, output_manager_test_notify);
@@ -711,8 +479,7 @@ prepareServer()
    // set up Wayland shells, i.e. XDG, layer shell and XWayland
    wl_list_init(&g_server->clients);
    
-   if(!(g_server->xdg_shell = wlr_xdg_shell_create(g_server->display, XDG_SHELL_VERSION)))
-      say(ERROR, "unable to create XDG shell interface");
+   g_server->xdg_shell = wlr_xdg_shell_create(g_server->display, XDG_SHELL_VERSION);
    LISTEN(&g_server->xdg_shell->events.new_toplevel, &g_server->xdg_new_toplevel, xdg_new_toplevel_notify);
    LISTEN(&g_server->xdg_shell->events.new_popup, &g_server->xdg_new_popup, xdg_new_popup_notify);
 
@@ -729,13 +496,13 @@ prepareServer()
    LISTEN(&g_server->session_lock_manager->events.new_lock, &g_server->new_lock_session_manager, new_lock_session_manager_notify);
    LISTEN(&g_server->session_lock_manager->events.destroy, &g_server->lock_session_manager_destroy, lock_session_manager_destroy_notify);
 
-   // set up output power manager
-   g_server->output_power_manager = wlr_output_power_manager_v1_create(g_server->display);
-   LISTEN(&g_server->output_power_manager->events.set_mode, &g_server->output_pm_set_mode, output_pm_set_mode_notify);
-
    // set initial size - will be updated when output is changed
    g_server->locked_bg = wlr_scene_rect_create(g_server->layer_tree[LyrLock], 1, 1, (float [4]){0.1, 0.1, 0.1, 1.0});
    wlr_scene_node_set_enabled(&g_server->locked_bg->node, 0);
+
+   // set up output power manager
+   g_server->output_power_manager = wlr_output_power_manager_v1_create(g_server->display);
+   LISTEN(&g_server->output_power_manager->events.set_mode, &g_server->output_pm_set_mode, output_pm_set_mode_notify);
 
    // set initial background - will be updated when output is changed
    g_server->root_bg = wlr_scene_rect_create(g_server->layer_tree[LyrBg], 1, 1, g_config->background_colour);
@@ -747,7 +514,6 @@ prepareServer()
    g_server->xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(g_server->display);
    LISTEN(&g_server->xdg_decoration_manager->events.new_toplevel_decoration, &g_server->new_decoration, new_decoration_notify);
 
-   wlr_presentation_create(g_server->display, g_server->backend);
 
    // Set up IPC interface
    wl_global_create(g_server->display, &zdwl_ipc_manager_v2_interface, DWL_IPC_VERSION, NULL, ipc_manager_bind);
@@ -764,7 +530,7 @@ prepareServer()
 }
 
 void 
-startServer(char* start_cmd) 
+startServer() 
 {
    say(INFO, "Starting Wayland server");
 
@@ -792,9 +558,6 @@ startServer(char* start_cmd)
    // choose initial output based on cursor position
    g_server->cur_output = get_output_at(g_server->cursor->x, g_server->cursor->y);
 
-   // Run autostarts and startup comand if defined
-   if(start_cmd[0]!='\0') spawn(start_cmd);
-   if(g_config->autostart_script[0]!='\0') spawn(g_config->autostart_script);
 }
 
 void 

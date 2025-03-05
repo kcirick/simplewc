@@ -91,6 +91,7 @@ executable (
     'src/ipc.c',
     'src/layer.c',
     'src/server.c',
+    'src/output.c',
     ],
   dependencies: dependencies_server,
   include_directories: ['include'],

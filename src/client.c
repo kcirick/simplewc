@@ -12,6 +12,7 @@
 #include "input.h"
 #include "client.h"
 #include "server.h"
+#include "output.h"
 
 static inline struct wlr_surface*
 get_client_surface(struct simple_client *client)

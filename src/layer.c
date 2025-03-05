@@ -11,22 +11,24 @@
 #include "input.h"
 #include "client.h"
 #include "server.h"
+#include "output.h"
 
 static const int layermap[] = {LyrBg, LyrBottom, LyrTop, LyrOverlay };
 
 void 
-arrange_layer(struct wl_list *list, const struct wlr_box *full_area, struct wlr_box *usable_area, bool exclusive) 
+arrange_layer(struct simple_output *output, struct wl_list *list, struct wlr_box *usable_area, bool exclusive) 
 {
    struct simple_layer_surface *surface;
+   struct wlr_box full_area = output->full_area;
 
    wl_list_for_each(surface, list, link) {
       struct wlr_layer_surface_v1 *wlr_lsurface = surface->scene_layer_surface->layer_surface;
-      struct wlr_layer_surface_v1_state *state = &wlr_lsurface->current;
+      //struct wlr_layer_surface_v1_state *state = &wlr_lsurface->current;
       
-      if(exclusive != (state->exclusive_zone>0)) 
+      if(exclusive != (wlr_lsurface->current.exclusive_zone > 0)) 
          continue;
       
-      wlr_scene_layer_surface_v1_configure(surface->scene_layer_surface, full_area, usable_area);
+      wlr_scene_layer_surface_v1_configure(surface->scene_layer_surface, &full_area, usable_area);
       wlr_scene_node_set_position(&surface->popups->node, surface->scene_tree->node.x, surface->scene_tree->node.y);
       surface->geom.x = surface->scene_tree->node.x;
       surface->geom.y = surface->scene_tree->node.y;
@@ -38,9 +40,9 @@ arrange_layers(struct simple_output *output)
 {
    say(DEBUG, "arrange_layers");
 
-   struct wlr_box full_area = { 0 };
-   wlr_output_effective_resolution(output->wlr_output, &full_area.width, &full_area.height);
-   struct wlr_box usable_area = full_area;
+   //struct wlr_box full_area = { 0 };
+   //wlr_output_effective_resolution(output->wlr_output, &full_area.width, &full_area.height);
+   struct wlr_box usable_area = output->full_area;
 
    //apply_override(output, &usable_area);
 
@@ -52,16 +54,15 @@ arrange_layers(struct simple_output *output)
 
    for(int i=N_LAYER_SHELL_LAYERS-1; i>=0; i--){
       // process exclusive-zone clients from top to bottom
-      arrange_layer(&output->layer_shells[i], &full_area, &usable_area, /* exclusive */ true);
+      arrange_layer(output, &output->layer_shells[i], &usable_area, /* exclusive */ true);
    }
 
    output -> usable_area = usable_area;
-   say(DEBUG, "Useable area = %dx%d+%d+%d / Full area = %dx%d+%d+%d", 
-         usable_area.width, usable_area.height, usable_area.x, usable_area.y,
-         full_area.width, full_area.height, full_area.x, full_area.y);
+   say(DEBUG, "Useable area = %dx%d+%d+%d", 
+         usable_area.width, usable_area.height, usable_area.x, usable_area.y);
 
    for(int i=0; i<N_LAYER_SHELL_LAYERS; i++){
-      arrange_layer(&output->layer_shells[i], &full_area, &usable_area, /* exclusive */ false);
+      arrange_layer(output, &output->layer_shells[i], &usable_area, /* exclusive */ false);
 
       // set node position to account for output layout change
       //wlr_scene_node_set_position(&server->layer_tree[i]->node, scene_output->x, scene_output->y);
@@ -118,6 +119,7 @@ layer_surface_commit_notify(struct wl_listener *listener, void *data)
    lsurface->mapped = wlr_lsurface->surface->mapped;
 
    arrange_layers(lsurface->output);
+   input_focus_surface(lsurface->scene_layer_surface->layer_surface->surface);
 }
 
 static void 
@@ -129,7 +131,7 @@ layer_surface_destroy_notify(struct wl_listener *listener, void *data)
 
    wl_list_remove(&lsurface->link);
    wl_list_remove(&lsurface->destroy.link);
-   wl_list_remove(&lsurface->map.link);
+   //wl_list_remove(&lsurface->map.link);
    wl_list_remove(&lsurface->unmap.link);
    wl_list_remove(&lsurface->surface_commit.link);
    //wlr_scene_node_destroy(&lsurface->scene_tree->node);
@@ -164,16 +166,19 @@ layer_new_surface_notify(struct wl_listener *listener, void *data)
    layer_surface->data = lsurface;
    lsurface->scene_tree->node.data = lsurface;
 
-   LISTEN(&layer_surface->surface->events.map, &lsurface->map, layer_surface_map_notify);
+   //LISTEN(&layer_surface->surface->events.map, &lsurface->map, layer_surface_map_notify);
    LISTEN(&layer_surface->surface->events.unmap, &lsurface->unmap, layer_surface_unmap_notify);
    LISTEN(&layer_surface->surface->events.commit, &lsurface->surface_commit, layer_surface_commit_notify);
    LISTEN(&layer_surface->events.destroy, &lsurface->destroy, layer_surface_destroy_notify);
 
    wl_list_insert(&output->layer_shells[layer_surface->pending.layer], &lsurface->link);
 
+   //wlr_surface_send_enter(layer_surface->surface, layer_surface->output);
+   
    struct wlr_layer_surface_v1_state old_state = layer_surface->current;
    layer_surface->current = layer_surface->pending;
    lsurface->mapped = 1;
-   arrange_layers(output);
+   //arrange_layers(output);
    layer_surface->current = old_state;
+   
 }

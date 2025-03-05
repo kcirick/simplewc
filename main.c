@@ -3,6 +3,7 @@
  *   - Main SimpleWC Program
  */
 
+#include <getopt.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <wlr/util/log.h>
@@ -42,7 +43,7 @@ say(int level, const char* message, ...)
    if(level==ERROR) exit(EXIT_FAILURE);
 }
 
-void 
+pid_t 
 spawn(char* cmd) 
 {
    char *sh = NULL;
@@ -66,12 +67,14 @@ spawn(char* cmd)
    //waitpid(pid, NULL, 0);
    */
    // from dwl:
-   if(fork()==0) {
+   pid_t pid = fork();
+   if(pid==0) {
       dup2(STDERR_FILENO, STDOUT_FILENO);
       setsid();
       execl(sh, sh, "-c", cmd, (char*) NULL);
       say(DEBUG, "execl %s failed", cmd);
    }
+   return pid;
 }
 
 void 
@@ -99,26 +102,36 @@ main(int argc, char **argv)
    char start_cmd[64] = { '\0' };
 
    // Parse arguments
-   for(int i=1; i<argc; i++){
-      char* iarg = argv[i];
-      if(!strcmp(iarg, "--config") && ((i+1)<argc)) {
-         sprintf(config_file, argv[++i]);
-      }
-      else if (!strcmp(iarg, "--start") && ((i+1)<argc)) {
-         sprintf(start_cmd, argv[++i]);
-      }
-      else if(!strcmp(iarg, "--debug")) {
-         info_level = WLR_DEBUG;
-      }
-      else if(!strcmp(iarg, "--version")) {
-         say(INFO, "Version-"VERSION);
-         exit(EXIT_SUCCESS);
-      }
-      else if(!strcmp(iarg, "--help")) {
-         say(INFO, "Usage: %s [--config file][--start cmd][--debug][--version][--help]", argv[0]);
-         exit(EXIT_SUCCESS);
-      }
-   }
+   int opt, long_index;
+   static struct option long_options[] = {
+      { "config",    required_argument,   0, 'c' },
+      { "start",     required_argument,   0, 's' },
+      { "debug",     no_argument,         0, 'd' },
+      { "version",   no_argument,         0, 'v' },
+      { "help",      no_argument,         0, 'h' },
+      { 0, 0, 0, 0 }
+    };
+   while ((opt = getopt_long(argc, argv,"c:s:dvh", 
+               long_options, &long_index )) != -1) {
+      switch (opt) {
+         case 'c' : 
+            sprintf(config_file, optarg);
+            break;
+         case 's' : 
+            sprintf(start_cmd, optarg);
+            break;
+         case 'd' : 
+            info_level = WLR_DEBUG; 
+            break;
+         case 'v' : 
+            say(INFO, "Version-"VERSION);
+            exit(EXIT_SUCCESS);
+         default: 
+            say(INFO, "Usage: %s [--config file][--start cmd][--debug][--version][--help]", argv[0]);
+            exit(EXIT_SUCCESS);
+        }
+    }
+
    if(config_file[0]=='\0')
       sprintf(config_file, "%s/%s", getenv("HOME"), ".config/simplewc/configrc");
 
@@ -129,9 +142,9 @@ main(int argc, char **argv)
    // Handle signals
    int signals[] = { SIGCHLD, SIGINT, SIGTERM, SIGPIPE };
    struct sigaction sa;
-   sigemptyset(&sa.sa_mask);
    sa.sa_flags = 0;
    sa.sa_handler = signal_handler;
+   sigemptyset(&sa.sa_mask);
 
    for(int i=0; i<LENGTH(signals); i++)
       sigaction(signals[i], &sa, NULL);
@@ -149,12 +162,27 @@ main(int argc, char **argv)
       say(ERROR, "Cannot allocate g_server");
    prepareServer();
    
-   startServer(start_cmd);
+   startServer();
+
+   // Run autostarts and startup comand if defined
+   pid_t start_cmd_pid, autostart_pid;
+   if(start_cmd[0]!='\0') start_cmd_pid = spawn(start_cmd);
+   if(g_config->autostart_script[0]!='\0') autostart_pid = spawn(g_config->autostart_script);
 
    // Run the main Wayland event loop
    wl_display_run(g_server->display);
    
    cleanupServer();
-     
+
+   // clean up pid
+   if(start_cmd_pid>0){
+      kill(start_cmd_pid, SIGTERM);
+      waitpid(start_cmd_pid, NULL, 0);
+   }
+   if(autostart_pid>0){
+      kill(autostart_pid, SIGTERM);
+      waitpid(autostart_pid, NULL, 0);
+   }
+
    return EXIT_SUCCESS;
 }

@@ -1,6 +1,8 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
+#include "layer.h"
+
 struct simple_client {
    struct wl_list link;
    struct simple_output *output;

@@ -9,6 +9,7 @@
 #include "layer.h"
 #include "client.h"
 #include "server.h"
+#include "output.h"
 
 void 
 key_function(struct keymap *keymap) 

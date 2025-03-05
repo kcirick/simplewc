@@ -16,6 +16,7 @@
 #include "globals.h"
 #include "layer.h"
 #include "server.h"
+#include "output.h"
 #include "client.h"
 #include "action.h"
 #include "input.h"

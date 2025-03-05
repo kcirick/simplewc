@@ -95,7 +95,7 @@ void reloadConfiguration();
 
 //--- functions in main.c -----
 void say(int, const char*, ...);
-void spawn(char*);
+pid_t spawn(char*);
 void send_signal(int);
 
 #endif

@@ -28,7 +28,7 @@ border_colour_outline = #FFFFFF
 
 #--- Key Bindings -----
 KEY = A+q QUIT 0
-KEY = A+l LOCK lock_cmd 
+#KEY = A+l LOCK lock_cmd 
 KEY = S+A+Return SPAWN foot
 #--- Client actions
 KEY = A+Tab CLIENT cycle
@@ -55,10 +55,10 @@ KEY = A+S+Down CLIENT resize
 #--- Tiling (auto-tile)
 KEY = A+t TAG tile
 #--- Manual tiling
-KEY = W+S+Left Client tile_left
-KEY = W+S+Right Client tile_right
+KEY = W+S+Left CLIENT tile_left
+KEY = W+S+Right CLIENT tile_right
 
 #--- Mouse Bindings -----
 MOUSE = A+Button_Left CLIENT move
 MOUSE = A+Button_Right CLIENT resize
-MOUSE = Button_Left ROOT test
+#MOUSE = Button_Left ROOT test

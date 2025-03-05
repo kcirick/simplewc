@@ -72,8 +72,9 @@ Still a work in progress, and not in a working state yet. Stay tuned...
 ## Version Log
 
   - 0.3 (Work in progress)
-    - Goal: Continue to improve the compositor
+    - Goal: Better support for multihead; Continue to improve the compositor
     - Uses wlroots v0.18
+    - Improved support for multihead
   - 0.2 (2024-08-29) ([download][v02])
     - Goal: add in additional features
     - Uses wlroots v0.17

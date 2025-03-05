@@ -109,30 +109,6 @@ struct simple_server {
    uint32_t resize_edges;
 };
 
-struct simple_output {
-   struct wl_list link;
-   struct wlr_output *wlr_output;
-
-   struct wl_list layer_shells[N_LAYER_SHELL_LAYERS];
-
-   struct wl_list ipc_outputs; // ipc addition
-
-   struct wl_listener frame;
-   struct wl_listener request_state;
-   struct wl_listener destroy;
-
-   unsigned int current_tag;
-   unsigned int visible_tags;
-
-   struct wlr_session_lock_surface_v1 *lock_surface;
-   struct wl_listener lock_surface_destroy;
-
-   struct wlr_box full_area;
-   struct wlr_box usable_area;
-
-   bool gamma_lut_changed;
-};
-
 struct client_outline {
    struct wlr_scene_tree *tree;
    int line_width;
@@ -157,17 +133,15 @@ struct simple_session_lock {
 struct client_outline* client_outline_create(struct wlr_scene_tree*, float*, int);
 void client_outline_set_size(struct client_outline*, int, int);
 
-struct simple_output* get_output_at(double, double);
+void check_idle_inhibitor();
 
 void print_server_info();
+
 void setCurrentTag(int, bool);
 void tileTag();
-void arrange_output(struct simple_output*);
 
 void prepareServer();
-void startServer(char*);
+void startServer();
 void cleanupServer();
-
-void set_output_state(bool);
 
 #endif

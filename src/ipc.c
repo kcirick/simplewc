@@ -7,6 +7,7 @@
 #include "layer.h"
 #include "client.h"
 #include "server.h"
+#include "output.h"
 #include "action.h"
 #include "ipc.h"
 
