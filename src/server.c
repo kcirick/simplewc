@@ -134,7 +134,7 @@ tileTag()
          new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
          client->geom = new_geom;
 
-         set_client_geometry(client, false);
+         set_client_geometry(client);
       } else {
          new_geom.x = output->usable_area.x + output->usable_area.width/2 + gap_width/2 + bw;
          new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
@@ -143,7 +143,7 @@ tileTag()
          new_geom.height -= 2*bw;
          client->geom = new_geom;
          
-         set_client_geometry(client, false);
+         set_client_geometry(client);
       }
       i++;
    }

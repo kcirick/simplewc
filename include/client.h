@@ -44,6 +44,8 @@ struct simple_client {
 
    // geometry of the wlr_surface within the view as currently displayed
    struct wlr_box geom;
+
+   bool resize_requested;
 };
    
 //--- action calls
@@ -64,8 +66,9 @@ void focus_client(struct simple_client*, bool);
 void begin_interactive(struct simple_client*, enum CursorMode, uint32_t);
 
 void get_client_geometry(struct simple_client*, struct wlr_box*);
-void set_client_geometry(struct simple_client*, bool);
+void set_client_geometry(struct simple_client*);
 void set_client_border_colour(struct simple_client*, int);
+void update_border_geometry(struct simple_client*);
 
 void xdg_new_toplevel_notify(struct wl_listener*, void*);
 void xdg_new_popup_notify(struct wl_listener*, void*);

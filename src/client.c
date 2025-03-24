@@ -72,7 +72,7 @@ maximizeClient(struct simple_client *client)
    new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
    
    client->geom = new_geom;
-   set_client_geometry(client, false);
+   set_client_geometry(client);
 }
 
 void
@@ -113,7 +113,7 @@ tileClient(struct simple_client *client, enum Direction direction)
 
    say(DEBUG, " >> %d %d %d %d", new_geom.x, new_geom.y, new_geom.width, new_geom.height);
    client->geom = new_geom;
-   set_client_geometry(client, false);
+   set_client_geometry(client);
 }
 
 void
@@ -343,31 +343,14 @@ get_client_geometry(struct simple_client *client, struct wlr_box *geom)
    }
 }
 
-void 
-set_client_geometry(struct simple_client *client, bool interactive) 
-{
-   
+void
+update_border_geometry(struct simple_client *client) {
+
    struct wlr_box xdg_geom = {0};
-
-   if(client->type==XDG_SHELL_CLIENT){
-      wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
-      wlr_scene_node_set_position(&client->scene_surface_tree->node, 0, 0);
-      wlr_xdg_toplevel_set_size(client->xdg_surface->toplevel, client->geom.width, client->geom.height);
-
-      if(interactive){
-         wlr_xdg_surface_get_geometry(client->xdg_surface, &xdg_geom);
-         client->geom.width = xdg_geom.width;
-         client->geom.height = xdg_geom.height;
-      }
-#if XWAYLAND
-   } else {
-      wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
-      wlr_scene_node_set_position(&client->scene_surface_tree->node, 0, 0);
-      wlr_xwayland_surface_configure(client->xwl_surface, 
-         client->geom.x, client->geom.y, client->geom.width, client->geom.height);
-#endif
-   }
-
+   wlr_xdg_surface_get_geometry(client->xdg_surface, &xdg_geom);
+   client->geom.width = xdg_geom.width;
+   client->geom.height = xdg_geom.height;
+   
    //borders
    int bw = g_config->border_width;
    //top
@@ -382,7 +365,24 @@ set_client_geometry(struct simple_client *client, bool interactive)
    //right
    wlr_scene_rect_set_size(client->border[3], bw, client->geom.height + 2 * bw);
    wlr_scene_node_set_position(&client->border[3]->node, client->geom.width, -bw);
+}
 
+void 
+set_client_geometry(struct simple_client *client) 
+{
+   if(client->type==XDG_SHELL_CLIENT){
+      wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
+      wlr_scene_node_set_position(&client->scene_surface_tree->node, 0, 0);
+      wlr_xdg_toplevel_set_size(client->xdg_surface->toplevel, client->geom.width, client->geom.height);
+#if XWAYLAND
+   } else {
+      wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
+      wlr_scene_node_set_position(&client->scene_surface_tree->node, 0, 0);
+      wlr_xwayland_surface_configure(client->xwl_surface, 
+         client->geom.x, client->geom.y, client->geom.width, client->geom.height);
+#endif
+   }
+   client->resize_requested = 1;
 }
 
 void 
@@ -476,7 +476,7 @@ set_initial_geometry(struct simple_client* client)
       client->border[i]->node.data = client;
    }
 
-   set_client_geometry(client, false);
+   set_client_geometry(client);
 }
 
 // --- Common notify functions -------------------------------------------
@@ -576,12 +576,18 @@ unmap_notify(struct wl_listener *listener, void *data)
 static void
 commit_notify(struct wl_listener *listener, void *data)
 {
+   say(DEBUG, "client_commit_notify");
    struct simple_client *client = wl_container_of(listener, client, commit);
 
    if(client->xdg_surface->initial_commit){
       wlr_xdg_toplevel_set_wm_capabilities(client->xdg_surface->toplevel, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN);
       wlr_xdg_toplevel_set_size(client->xdg_surface->toplevel, 0, 0);
       return;
+   }
+   
+   if(client->resize_requested){ 
+      update_border_geometry(client);
+      client->resize_requested=false;
    }
 }
 
@@ -705,7 +711,7 @@ xwl_request_configure_notify(struct wl_listener *listener, void *data)
    if(!wlr_box_empty(&client->geom)){
       client->geom.x = event->x;          client->geom.y = event->y;
       client->geom.width = event->width;  client->geom.height = event->height;
-      set_client_geometry(client, false);
+      set_client_geometry(client);
    }
 
    wlr_xwayland_surface_configure(client->xwl_surface, event->x, event->y, event->width, event->height);

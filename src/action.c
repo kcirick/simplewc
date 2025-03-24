@@ -55,14 +55,14 @@ key_function(struct keymap *keymap)
          if(keymap->keysym==XKB_KEY_Right)   client->geom.x+=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Up)      client->geom.y-=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Down)    client->geom.y+=g_config->moveresize_step;
-         set_client_geometry(client, false);
+         set_client_geometry(client);
       }
       if(!strcmp(keymap->argument, "resize")){
          if(keymap->keysym==XKB_KEY_Left)    client->geom.width-=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Right)   client->geom.width+=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Up)      client->geom.height-=g_config->moveresize_step;
          if(keymap->keysym==XKB_KEY_Down)    client->geom.height+=g_config->moveresize_step;
-         set_client_geometry(client, false);
+         set_client_geometry(client);
       }
       // ...
       arrange_output(g_server->cur_output);

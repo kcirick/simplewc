@@ -138,7 +138,7 @@ process_cursor_move(uint32_t time)
    client->geom.x = g_server->cursor->x - g_server->grab_x;
    client->geom.y = g_server->cursor->y - g_server->grab_y;
 
-   set_client_geometry(client, true);
+   set_client_geometry(client);
 }
 
 static void 
@@ -182,7 +182,7 @@ process_cursor_resize(uint32_t time)
    if(client->type==XDG_SHELL_CLIENT)
       wlr_xdg_toplevel_set_bounds(client->xdg_surface->toplevel, client->geom.width, client->geom.height);
    
-   set_client_geometry(client, true);
+   set_client_geometry(client);
 }
 
 static void 
