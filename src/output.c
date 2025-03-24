@@ -248,9 +248,6 @@ new_output_notify(struct wl_listener *listener, void *data)
 
    wlr_scene_node_set_enabled(&g_server->root_bg->node, 1);
 
-   //say(INFO, " -> Output %s : %dx%d+%d+%d", l_output->output->name,
-   //      l_output->output->width, l_output->output->height, 
-   //      l_output->x, l_output->y);
    say(INFO, " -> Output %s : %dx%d+%d+%d", l_output->output->name,
          output->usable_area.width, output->usable_area.height, 
          output->usable_area.x, output->usable_area.y);

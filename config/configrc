@@ -32,7 +32,7 @@ KEY = A+q QUIT 0
 KEY = S+A+Return SPAWN foot
 #--- Client actions
 KEY = A+Tab CLIENT cycle
-KEY = A+k CLINET kill
+KEY = A+k CLIENT kill
 #--- Tags
 KEY = A+1 TAG select
 KEY = A+2 TAG select

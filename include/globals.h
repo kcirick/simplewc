@@ -21,8 +21,8 @@
 #define LISTEN(E, L, H)    wl_signal_add((E), ((L)->notify = (H), (L)))
 #define LENGTH(X)          (sizeof X / sizeof X[0])
 #define TAGMASK(T)         (1 << (T))
-//#define VISIBLEON(C, O)    ((O) && (C)->output==(O) && ((C)->fixed || ((C)->tag & (O)->visible_tags)))
-#define VISIBLEON(C, O)    ((O) && ((C)->fixed || ((C)->tag & (O)->visible_tags)))
+#define VISIBLEON(C, O)    ((O) && (C)->output==(O) && ((C)->fixed || ((C)->tag & (O)->visible_tags)))
+//#define VISIBLEON(C, O)    ((O) && ((C)->fixed || ((C)->tag & (O)->visible_tags)))
 #define MIN(A, B)          ((A)<(B) ? (A) : (B))
 #define MAX(A, B)          ((A)>(B) ? (A) : (B))
 
