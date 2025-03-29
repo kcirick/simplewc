@@ -81,7 +81,7 @@ simple_ipc_tags(void *data, struct zdwl_ipc_manager_v2 *ipc_manager, uint32_t co
 static void simple_ipc_output_active(void *, struct zdwl_ipc_output_v2 *, uint32_t);
 static void simple_ipc_output_tag(void *, struct zdwl_ipc_output_v2 *, uint32_t, uint32_t, uint32_t, uint32_t);
 static void simple_ipc_output_title(void *, struct zdwl_ipc_output_v2 *, const char*);
-static void simple_ipc_output_appid(void *, struct zdwl_ipc_output_v2 *, const char*);
+//static void simple_ipc_output_appid(void *, struct zdwl_ipc_output_v2 *, const char*);
 static void simple_ipc_output_fullscreen(void *, struct zdwl_ipc_output_v2 *, uint32_t);
 static void simple_ipc_output_frame(void *, struct zdwl_ipc_output_v2 *);
 
@@ -90,7 +90,7 @@ static const struct zdwl_ipc_output_v2_listener ipc_output_listener = {
    .tag = simple_ipc_output_tag,
    .layout = noop,
    .title = simple_ipc_output_title,
-   .appid = simple_ipc_output_appid,
+   .appid = noop,
    .layout_symbol = noop,
    .fullscreen = simple_ipc_output_fullscreen,
    .floating = noop,
@@ -103,8 +103,8 @@ simple_ipc_output_active(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, 
    //say(INFO, "dwl_ipc_output_active\n"); 
    if(!(mode&GET && flag_output)) return;
 
-   //char* output_name = data;
-   say(INFO, " |--> active = %u\n", active?1:0);
+   char* output_name = data;
+   say(INFO, "Output %s [%s]\n", output_name, active?"active":" ");
 }
 
 void
@@ -119,8 +119,8 @@ simple_ipc_output_tag(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output,
    if(!flag_tag) return;
 
    if(mode&GET) {
-      say(INFO, " |--> tag %u %s\n", tag, isurgent ? "URG" : "");
-      say(INFO, "   |--> active: %u / n clients = %u / focused client: %u\n", state, clients, focused);
+      say(INFO, " |--> tag %u [%s%s] : n_clients=%u / focused_client=%u\n", \
+            tag, state?"active":" ", isurgent?":URG":"", clients, focused);
    }
 }
 
@@ -132,7 +132,7 @@ simple_ipc_output_title(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, c
    
    say(INFO, " |--> focused client title: %s\n", title);
 }
-
+/*
 void
 simple_ipc_output_appid(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, const char* appid)
 {
@@ -140,7 +140,7 @@ simple_ipc_output_appid(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, c
    if(!(mode&GET && flag_client && (!strcmp(arg, "appid")||!strcmp(arg, "all")))) return;
    say(INFO, " |--> focused client appid: %s\n", appid);
 }
-
+*/
 void
 simple_ipc_output_fullscreen(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, uint32_t is_fullscreen)
 {
@@ -213,9 +213,9 @@ simple_output_name(void *data, struct wl_output *output, const char *name)
    if(outputs) {
       struct output *o = (struct output*) data;
       o->output_name = strdup(name);
-      say(INFO, "Output + %s\n", name);
-   } else
-      say(INFO, "Output: %s\n", name);
+      //say(INFO, "Output + %s\n", name);
+   } //else
+      //say(INFO, "Output: %s\n", name);
    if(output_name && !strcmp(output_name, name)) {
       wl_output_release(output);
       return;
