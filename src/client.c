@@ -56,6 +56,47 @@ toggleClientFixed(struct simple_client *client)
 }
 
 void
+toggleClientFullscreen(struct simple_client *client)
+{
+   if(!client) return;
+
+   client->fullscreen ^= 1;
+
+   setClientFullscreen(client, client->fullscreen);
+}
+
+void setClientFullscreen(struct simple_client *client, int fullscreen)
+{
+   say(DEBUG, "setClientFullscreen");
+   if(!client) return;
+
+   client->fullscreen = fullscreen;
+#ifdef XWAYLAND
+   if(client->type==XWL_MANAGED_CLIENT || client->type==XWL_UNMANAGED_CLIENT)
+      wlr_xwayland_surface_set_fullscreen(client->xwl_surface, client->fullscreen);
+   else
+#endif
+      wlr_xdg_toplevel_set_fullscreen(client->xdg_surface->toplevel, client->fullscreen);
+
+   wlr_scene_node_reparent(&client->scene_tree->node, g_server->layer_tree[client->fullscreen ? LyrFS : LyrClient]);
+
+   if(fullscreen){
+      client->prev_geom = client->geom;
+      struct wlr_box new_geom;
+      new_geom.x = client->output->full_area.x;
+      new_geom.y = client->output->full_area.y;
+      new_geom.width = client->output->full_area.width;
+      new_geom.height = client->output->full_area.height;
+   
+      client->geom = new_geom;
+      set_client_geometry(client);
+   } else {
+      client->geom = client->prev_geom;
+      set_client_geometry(client);
+   }
+}
+
+void
 maximizeClient(struct simple_client *client)
 {
    if(!client) return;
@@ -353,6 +394,7 @@ update_border_geometry(struct simple_client *client) {
    
    //borders
    int bw = g_config->border_width;
+   if(client->fullscreen) bw = 0;
    //top
    wlr_scene_rect_set_size(client->border[0], client->geom.width, bw);
    wlr_scene_node_set_position(&client->border[0]->node, 0, -bw);
@@ -599,6 +641,7 @@ destroy_notify(struct wl_listener *listener, void *data)
 //   struct simple_output * output = g_server->cur_output;
 
    wl_list_remove(&client->destroy.link);
+   wl_list_remove(&client->request_fullscreen.link);
    if(client->type==XDG_SHELL_CLIENT){
       wl_list_remove(&client->map.link);
       wl_list_remove(&client->unmap.link);
@@ -641,6 +684,24 @@ popup_commit_notify(struct wl_listener *listener, void *data)
    wl_list_remove(&listener->link);
 }
 
+static void
+fullscreen_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "fullscreen_notify");
+   struct simple_client *client = wl_container_of(listener, client, request_fullscreen);
+   int want_fullscreen = 0;
+#ifdef XWAYLAND
+   if(client->type==XWL_MANAGED_CLIENT || client->type==XWL_UNMANAGED_CLIENT)
+      want_fullscreen = client->xwl_surface->fullscreen;
+   else
+#endif
+      want_fullscreen = client->xdg_surface->toplevel->requested.fullscreen;
+   
+   say(DEBUG, "want_fullscreen = %u", want_fullscreen);
+
+   setClientFullscreen(client, want_fullscreen);
+}
+
 // --- XDG Shell ---------------------------------------------------------
 void 
 xdg_new_toplevel_notify(struct wl_listener *listener, void *data)
@@ -657,6 +718,7 @@ xdg_new_toplevel_notify(struct wl_listener *listener, void *data)
    LISTEN(&xdg_toplevel->base->surface->events.map, &xdg_client->map, map_notify);
    LISTEN(&xdg_toplevel->base->surface->events.unmap, &xdg_client->unmap, unmap_notify);
    LISTEN(&xdg_toplevel->base->surface->events.commit, &xdg_client->commit, commit_notify);
+   LISTEN(&xdg_toplevel->events.request_fullscreen, &xdg_client->request_fullscreen, fullscreen_notify);
 }
 
 static struct wl_listener popup_commit_listener;
@@ -729,11 +791,13 @@ xwl_set_title_notify(struct wl_listener *listener, void *data)
    say(DEBUG, "xwl_set_title_notify");
 }
 
+/*
 static void
 xwl_request_fullscreen_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "xwl_request_fullscreen_notify");
 }
+*/
 
 xcb_atom_t
 getatom(xcb_connection_t *xc, const char *name)
@@ -793,7 +857,7 @@ xwl_new_surface_notify(struct wl_listener *listener, void *data)
 
    LISTEN(&xsurface->events.request_activate, &xwl_client->request_activate, xwl_request_activate_notify);
    LISTEN(&xsurface->events.request_configure, &xwl_client->request_configure, xwl_request_configure_notify);
-   LISTEN(&xsurface->events.request_fullscreen, &xwl_client->request_fullscreen, xwl_request_fullscreen_notify);
+   LISTEN(&xsurface->events.request_fullscreen, &xwl_client->request_fullscreen, fullscreen_notify);
 
    LISTEN(&xsurface->events.set_hints, &xwl_client->set_hints, xwl_set_hints_notify);
    LISTEN(&xsurface->events.set_title, &xwl_client->set_title, xwl_set_title_notify);

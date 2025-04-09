@@ -22,6 +22,7 @@ struct simple_client {
    struct wl_listener unmap;
    struct wl_listener destroy;
    struct wl_listener commit;
+   struct wl_listener request_fullscreen;
 //   struct wl_listener decoration_mode;
 //   struct wl_listener decoration_destroy;
 
@@ -33,17 +34,18 @@ struct simple_client {
    struct wl_listener request_configure;
    struct wl_listener set_hints;
    struct wl_listener set_title;
-   struct wl_listener request_fullscreen;
 #endif
 
    uint32_t tag;
    bool fixed;
    bool urgent;
+   bool fullscreen;
 
    bool visible;
 
    // geometry of the wlr_surface within the view as currently displayed
    struct wlr_box geom;
+   struct wlr_box prev_geom;
 
    bool resize_requested;
 };
@@ -52,6 +54,8 @@ struct simple_client {
 void sendClientToTag(struct simple_client*, int);
 void toggleClientFixed(struct simple_client*);
 void toggleClientVisible(struct simple_client*);
+void toggleClientFullscreen(struct simple_client*);
+void setClientFullscreen(struct simple_client*, int);
 void cycleClients(struct simple_output*);
 void killClient(struct simple_client*);
 void tileClient(struct simple_client*, enum Direction);

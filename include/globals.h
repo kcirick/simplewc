@@ -35,7 +35,7 @@ enum CursorMode      { CURSOR_NORMAL, CURSOR_MOVE, CURSOR_RESIZE, CURSOR_PRESSED
 enum MessageType        { DEBUG, INFO, WARNING, ERROR, NMSG };
 enum ClientType         { XDG_SHELL_CLIENT, LAYER_SHELL_CLIENT, XWL_MANAGED_CLIENT, XWL_UNMANAGED_CLIENT };
 enum InputType          { INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
-enum LayerType          { LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, LyrLock, NLayers }; // scene layers
+enum LayerType          { LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, LyrFS, LyrLock, NLayers }; // scene layers
 enum NodeDescriptorType { NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP };
 enum Direction          { LEFT, RIGHT, UP, DOWN };
 #ifdef XWAYLAND

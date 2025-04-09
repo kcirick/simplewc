@@ -25,12 +25,19 @@ arrange_output(struct simple_output* output)
 
    get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
    
+   wlr_scene_node_set_enabled(&output->fullscreen_bg->node, focused_client && focused_client->fullscreen);
+
    int n=0;
    wl_list_for_each(client, &g_server->clients, link) {
       if(client->visible && VISIBLEON(client, output)) n++;
       set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
       wlr_scene_node_set_enabled(&client->scene_tree->node, client->visible && VISIBLEON(client, output));
    }
+
+   if(focused_client && focused_client->fullscreen)
+         wlr_scene_node_set_enabled(&output->fullscreen_bg->node, 1);
+   else
+         wlr_scene_node_set_enabled(&output->fullscreen_bg->node, 0);
 
    if(n>0){
       if(!focused_client)
@@ -130,6 +137,8 @@ output_destroy_notify(struct wl_listener *listener, void *data)
    wl_list_remove(&output->request_state.link);
    wl_list_remove(&output->destroy.link);
    wl_list_remove(&output->link);
+
+   wlr_scene_node_destroy(&output->fullscreen_bg->node);
    free(output);
 }
 
@@ -209,6 +218,9 @@ new_output_notify(struct wl_listener *listener, void *data)
 
    wl_list_init(&output->ipc_outputs);   // ipc addition
 
+   output->fullscreen_bg = wlr_scene_rect_create(g_server->layer_tree[LyrFS], 0, 0, (float [4]){0.1, 0.1, 0.1, 1.0});
+   wlr_scene_node_set_enabled(&output->fullscreen_bg->node, 0);
+
    LISTEN(&wlr_output->events.frame, &output->frame, output_frame_notify);
    LISTEN(&wlr_output->events.destroy, &output->destroy, output_destroy_notify);
    LISTEN(&wlr_output->events.request_state, &output->request_state, output_request_state_notify);
@@ -221,6 +233,7 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_scene_node_lower_to_bottom(&g_server->layer_tree[LyrBottom]->node);
    wlr_scene_node_lower_to_bottom(&g_server->layer_tree[LyrBg]->node);
    wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrTop]->node);
+   wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrFS]->node);
    wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrOverlay]->node);
    wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrLock]->node);
 
@@ -245,6 +258,9 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_scene_rect_set_size(g_server->root_bg, geom.width, geom.height);
    wlr_scene_node_set_position(&g_server->locked_bg->node, geom.x, geom.y);
    wlr_scene_rect_set_size(g_server->locked_bg, geom.width, geom.height);
+
+   wlr_scene_node_set_position(&output->fullscreen_bg->node, output->usable_area.x, output->usable_area.y);
+   wlr_scene_rect_set_size(output->fullscreen_bg, output->usable_area.width, output->usable_area.height);
 
    wlr_scene_node_set_enabled(&g_server->root_bg->node, 1);
 

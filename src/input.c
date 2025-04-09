@@ -10,6 +10,7 @@
 #include <wlr/types/wlr_primary_selection.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_xcursor_manager.h>
+#include <wlr/types/wlr_relative_pointer_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/edges.h>
 
@@ -186,13 +187,19 @@ process_cursor_resize(uint32_t time)
 }
 
 static void 
-process_cursor_motion(uint32_t time) 
+process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx, double dy,
+      double dx_unaccel, double dy_unaccel) 
 {
    //say(DEBUG, "process_cursor_motion");
 
    // time is 0 in internal calls meant to restore point focus
    if(time>0){
+      say(DEBUG, "time>0");
       wlr_idle_notifier_v1_notify_activity(g_server->idle_notifier, g_server->seat);
+
+      wlr_relative_pointer_manager_v1_send_relative_motion(
+            g_server->relative_pointer_manager, g_server->seat, (uint64_t)time*1000,
+            dx, dy, dx_unaccel, dy_unaccel);
    }
 
    // update drag icon's position
@@ -245,17 +252,22 @@ cursor_motion_notify(struct wl_listener *listener, void *data)
    struct wlr_pointer_motion_event *event = data;
 
    wlr_cursor_move(g_server->cursor, &event->pointer->base, event->delta_x, event->delta_y);
-   process_cursor_motion(event->time_msec);
+   process_cursor_motion(event->time_msec, &event->pointer->base, event->delta_x, event->delta_y, 
+         event->unaccel_dx, event->unaccel_dy);
 }
 
 static void 
 cursor_motion_abs_notify(struct wl_listener *listener, void *data) 
 {
-  // say(DEBUG, "cursor_motion_abs_notify");
+   //say(DEBUG, "cursor_motion_abs_notify");
    struct wlr_pointer_motion_absolute_event *event = data;
+   double lx, ly, dx, dy;
 
    wlr_cursor_warp_absolute(g_server->cursor, &event->pointer->base, event->x, event->y);
-   process_cursor_motion(event->time_msec);
+   wlr_cursor_absolute_to_layout_coords(g_server->cursor, &event->pointer->base, event->x, event->y, &lx, &ly);
+   dx = lx - g_server->cursor->x;
+   dy = ly - g_server->cursor->y;
+   process_cursor_motion(event->time_msec, &event->pointer->base, dx, dy, dx, dy);
 }
 
 static void 
@@ -505,6 +517,8 @@ input_init()
    // create a cursor manager
    g_server->cursor_manager = wlr_xcursor_manager_create(NULL, 24);
    wlr_xcursor_manager_load(g_server->cursor_manager, 1);
+
+   g_server->relative_pointer_manager = wlr_relative_pointer_manager_v1_create(g_server->display);
 
    g_server->cursor_mode = CURSOR_NORMAL;
    LISTEN(&g_server->cursor->events.motion, &g_server->cursor_motion, cursor_motion_notify);

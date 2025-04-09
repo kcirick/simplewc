@@ -61,6 +61,7 @@ struct simple_server {
 
    struct wlr_cursor *cursor;
    struct wlr_xcursor_manager *cursor_manager;
+   struct wlr_relative_pointer_manager_v1 *relative_pointer_manager;
    enum CursorMode cursor_mode;
    struct wl_listener cursor_motion;
    struct wl_listener cursor_motion_abs;

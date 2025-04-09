@@ -3,6 +3,14 @@ TODO
 	* : Improve simplewc-msg functionality
 
 v0.2 -> v0.3 Changes
+2025-04-09:
+	* src/action.c: Add "toggle_fullscreen" to CLIENT action
+	* src/client.c: Adding toggleClientFullscreen() and setClientFullscreen()
+	which is also referenced by fullscreen_notify()
+	* src/input.c: Adding wlr_relative_pointer_manager_v1
+	* src/output.c: Add fullscreen support, e.g. LyrFS
+
+2025-03-04:
 	* main.c: Use getopt_long for command line arguments. keep track of startup
 	pid and kill upon exit
 	* src/output.c, include/output.h: Splitting output code from server code

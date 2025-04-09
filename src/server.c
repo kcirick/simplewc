@@ -170,6 +170,7 @@ print_server_info()
          say(DEBUG, "    -> client tag = %u", client->tag);
          say(DEBUG, "    -> client fixed = %b", client->fixed);
          say(DEBUG, "    -> client visible = %b", client->visible);
+         say(DEBUG, "    -> client fullscreen = %b", client->fullscreen);
          say(DEBUG, "    -> client urgent = %b", client->urgent);
       }
    }
@@ -412,6 +413,7 @@ prepareServer()
     * | layer      | type          | example  |
     * |------------|---------------|----------|
     * | LyrLock    | lock-manager  | swaylock |
+    * | LyrFS      | layer-shell   | fullscrn |
     * | LyrOverlay | layer-shell   |          |
     * | LyrTop     | layer-shell   | waybar   |
     * | LyrClient  | normal client |          |

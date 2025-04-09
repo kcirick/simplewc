@@ -9,6 +9,8 @@ struct simple_output {
 
    struct wl_list ipc_outputs; // ipc addition
 
+   struct wlr_scene_rect *fullscreen_bg;
+
    struct wl_listener frame;
    struct wl_listener request_state;
    struct wl_listener destroy;

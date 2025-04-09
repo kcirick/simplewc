@@ -75,6 +75,7 @@ Still a work in progress, and not in a working state yet. Stay tuned...
     - Goal: Better support for multihead; Continue to improve the compositor
     - Uses wlroots v0.18
     - Improved support for multihead
+    - Added fullscreen support
   - 0.2 (2024-08-29) ([download][v02])
     - Goal: add in additional features
     - Uses wlroots v0.17

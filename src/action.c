@@ -46,6 +46,7 @@ key_function(struct keymap *keymap)
       if(!strcmp(keymap->argument, "send_to_tag"))    sendClientToTag(client, keymap->keysym-XKB_KEY_1);
       if(!strcmp(keymap->argument, "toggle_fixed"))   toggleClientFixed(client);
       if(!strcmp(keymap->argument, "toggle_visible")) toggleClientVisible(client);
+      if(!strcmp(keymap->argument, "toggle_fullscreen")) toggleClientFullscreen(client);
       if(!strcmp(keymap->argument, "kill"))           killClient(client);
       if(!strcmp(keymap->argument, "maximize"))       maximizeClient(client);
       if(!strcmp(keymap->argument, "tile_left"))      tileClient(client, LEFT);
