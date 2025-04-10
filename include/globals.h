@@ -38,6 +38,7 @@ enum InputType          { INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
 enum LayerType          { LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, LyrFS, LyrLock, NLayers }; // scene layers
 enum NodeDescriptorType { NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP };
 enum Direction          { LEFT, RIGHT, UP, DOWN };
+enum FocusType          { NONE=0, SLOPPY, RAISE };
 #ifdef XWAYLAND
 enum NetAtoms  {NetWMWindowTypeDialog, NetWMWindowTypeSplash, NetWMWindowTypeToolbar, NetWMWindowTypeUtility, NetLast };
 #endif
@@ -49,7 +50,7 @@ struct simple_config {
    int n_tags;
    int border_width;
    int tile_gap_width;
-   bool sloppy_focus;
+   int focus_type;
    int moveresize_step;
    bool touchpad_tap_click;
 

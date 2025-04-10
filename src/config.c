@@ -53,7 +53,7 @@ set_defaults()
 {
    g_config->n_tags = 4;
    g_config->border_width = 2;
-   g_config->sloppy_focus = false;
+   g_config->focus_type = 0;
    g_config->moveresize_step = 10;
 
    colour2rgba("#111111", g_config->background_colour);
@@ -108,7 +108,7 @@ readConfiguration(char* filename)
       if(!strcmp(id, "border_width"))     g_config->border_width = atoi(value);
       if(!strcmp(id, "tile_gap_width"))   g_config->tile_gap_width = atoi(value);
       if(!strcmp(id, "moveresize_step"))  g_config->moveresize_step = atoi(value);
-      if(!strcmp(id, "sloppy_focus"))     g_config->sloppy_focus = !strcmp(value, "true") ? true : false; 
+      if(!strcmp(id, "focus_type"))       g_config->focus_type = atoi(value);
       if(!strcmp(id, "touchpad_tap_click"))  g_config->touchpad_tap_click = !strcmp(value, "true") ? true : false; 
 
       if(!strcmp(id, "background_colour"))      colour2rgba(value, g_config->background_colour);

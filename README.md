@@ -1,18 +1,18 @@
 # SimpleWC (Simple Wayland Compositor)
 
 It is a simple wlroots-based compositor (window manager) written to fit my specific needs, and a way 
-to teach myself the basics of window management. (formerly SimpleWay).
+to teach myself the basics of window management. 
 
 ## Description
 
- - Minimal stacking window manager for Wayland using wlroots (currently based on wlroots v0.17)
+ - Minimal stacking window manager for Wayland using wlroots (currently based on wlroots v0.18)
  - Not meant to be tiny or fast, but aims for simplicity in design and coding
  - Written in C
  - Built upon [tinywl], inspirations from [dwl] and [labwc]
  - Features:
    - No frills (menu, titlebar, icons, pixmap themes, etc...)
    - Text config file (default $HOME/.config/simplewc/configrc)
-   - Simple tiling (manual left-right tiling or auto-tile like DWL/DWM)
+   - Simple tiling (manual left-right tiling or one-shot auto-tile like DWL/DWM)
    - simplewc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])
 
 [tinywl]: https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl
@@ -32,10 +32,9 @@ v0.1
 
     > simplewc [--config file][--start cmd][--debug][--version][--help]
 
-    > simplewc-msg --set [--tag .+-^][--client tag_n][--output (on|off)]
-                  (--get|--watch) [--output][--tag][--client (title|appid)]
-                   --action (quit|reconfig|lock)
-
+    > simplewc-msg --set [tag .+-^][client tag_n]
+                  (--get|--watch) (tagcount|output|tag|client)
+                   --action (quit|lock|reconfig)
 
 ### Build
 
@@ -61,15 +60,10 @@ Default configuration file read from `$HOME/.config/simplewc/configrc`, and allo
  - keybinds
  - mouse binds 
 
-## Status
-Please use [Github Issues Tracker][ghit] to report bugs and issues.
-
-Still a work in progress, and not in a working state yet. Stay tuned...
-
-[ghit]: https://github.com/kcirick/simplewc/issues
-
 
 ## Version Log
+
+Please use [Github Issues Tracker][ghit] to report bugs and issues.
 
   - 0.3 (Work in progress)
     - Goal: Better support for multihead; Continue to improve the compositor
@@ -93,3 +87,5 @@ Still a work in progress, and not in a working state yet. Stay tuned...
 
 [v01]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.1.tar.gz
 [v02]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.2.tar.gz
+[ghit]: https://github.com/kcirick/simplewc/issues
+

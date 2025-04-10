@@ -554,6 +554,7 @@ map_notify(struct wl_listener *listener, void *data)
    client->visible = true;
    client->fixed = false;
    client->urgent = false;
+   client->fullscreen = false;
 
 #if XWAYLAND
    // Handle unmanaged clients first

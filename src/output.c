@@ -64,6 +64,7 @@ get_output_at(double x, double y)
    return NULL;
 }
 
+/*
 void
 set_output_state(bool state)
 {
@@ -78,6 +79,7 @@ set_output_state(bool state)
       wlr_output_commit_state(output->wlr_output, &wlr_state);
    }
 }
+*/
 
 //--- Output notify functions --------------------------------------------
 static void 

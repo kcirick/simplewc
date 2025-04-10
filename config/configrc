@@ -1,13 +1,15 @@
-# Sample SimpleWC Config
+#--------------------------------
+#--- Sample SimpleWC Config -----
+#--------------------------------
 
+#--- Number of tags -----
 n_tags = 3
 
 border_width = 3
 tile_gap_width = 10
-sloppy_focus = false
 moveresize_step = 10
-touchpad_tap_click = false
 
+#--- Colour definitions -----
 background_colour = #222222
 
 border_colour_focus = #1793D0
@@ -15,6 +17,10 @@ border_colour_unfocus = #333333
 border_colour_urgent = #FF0000 
 border_colour_fixed = #0000FF
 border_colour_outline = #FFFFFF
+
+#--- Focus style -----
+# 0 - none / 1 - sloppy / 2 - raise
+focus_type = 1
 
 #--- Command for locking -----
 #lock_cmd = swaylock -c 000000
@@ -26,13 +32,22 @@ border_colour_outline = #FFFFFF
 #xkb_layout = us
 #xkb_options = compose:ralt
 
+#--- Touchpad settings -----
+touchpad_tap_click = false
+
 #--- Key Bindings -----
 KEY = A+q QUIT 0
 #KEY = A+l LOCK lock_cmd 
+#--- Spawns
 KEY = S+A+Return SPAWN foot
+#KEY = XF86AudioMute SPAWN pactl set-sink-mute @DEFAULT_SINK@ toggle
 #--- Client actions
 KEY = A+Tab CLIENT cycle
 KEY = A+k CLIENT kill
+KEY = A+m CLIENT maximize
+KEY = A+f CLIENT toggle_fixed
+KEY = A+v CLIENT toggle_visible
+KEY = A+w CLIENT toggle_fullscreen
 #--- Tags
 KEY = A+1 TAG select
 KEY = A+2 TAG select

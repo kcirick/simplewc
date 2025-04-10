@@ -194,7 +194,6 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
 
    // time is 0 in internal calls meant to restore point focus
    if(time>0){
-      say(DEBUG, "time>0");
       wlr_idle_notifier_v1_notify_activity(g_server->idle_notifier, g_server->seat);
 
       wlr_relative_pointer_manager_v1_send_relative_motion(
@@ -231,9 +230,14 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
       }
    }
 
+   /*
    if(time>0 && client && ctype!=LAYER_SHELL_CLIENT && ctype_focused!=LAYER_SHELL_CLIENT 
       && client != focused_client && g_config->sloppy_focus && !g_server->seat->drag)
       focus_client(client, false);
+   */
+   if(time>0 && client && ctype!=LAYER_SHELL_CLIENT && ctype_focused!=LAYER_SHELL_CLIENT 
+      && client != focused_client && g_config->focus_type>0 && !g_server->seat->drag)
+      focus_client(client, g_config->focus_type==RAISE);
 
    if(surface) {
       wlr_seat_pointer_notify_enter(wlr_seat, surface, sx, sy);

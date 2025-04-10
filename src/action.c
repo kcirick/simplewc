@@ -91,6 +91,6 @@ process_ipc_action(const char* action)
    if(!strcmp(action, "lock"))      spawn(g_config->lock_cmd);
    if(!strcmp(action, "reconfig"))  reloadConfiguration();
 
-   if(!strcmp(action, "output_off"))   set_output_state(false);
-   if(!strcmp(action, "output_on"))    set_output_state(true);
+   //if(!strcmp(action, "output_off"))   set_output_state(false);
+   //if(!strcmp(action, "output_on"))    set_output_state(true);
 }

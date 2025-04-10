@@ -1,8 +1,14 @@
 TODO
 	* : Support multi-monitor setup
 	* : Improve simplewc-msg functionality
+	* : Use same tags across all outputs
 
 v0.2 -> v0.3 Changes
+2025-04-10:
+	* src/config.c: sloppy_focus to focus_type, support none, sloppy, and raise
+	* src/output.c: remove output-on/off function. Tools like wlopm do it better
+	* util/simplewc-msg.c: add --help flag
+
 2025-04-09:
 	* src/action.c: Add "toggle_fullscreen" to CLIENT action
 	* src/client.c: Adding toggleClientFullscreen() and setClientFullscreen()

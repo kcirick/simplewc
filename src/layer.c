@@ -70,6 +70,7 @@ arrange_layers(struct simple_output *output)
 }
 
 //--- Notify functions ---------------------------------------------------
+/*
 static void 
 layer_surface_map_notify(struct wl_listener *listener, void *data) 
 {
@@ -77,6 +78,7 @@ layer_surface_map_notify(struct wl_listener *listener, void *data)
    struct simple_layer_surface *lsurface = wl_container_of(listener, lsurface, map);
    input_focus_surface(lsurface->scene_layer_surface->layer_surface->surface);
 }
+*/
 
 static void 
 layer_surface_unmap_notify(struct wl_listener *listener, void *data) 

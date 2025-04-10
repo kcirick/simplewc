@@ -16,7 +16,7 @@
 
 
 enum MessageType     { DEBUG, INFO, WARNING, ERROR, NMSG };
-enum Mode            { NOMODE=0, SET=1<<0, GET=1<<1, WATCH=1<<2 | GET, ACTION=1<<3 };
+enum Mode            { NOMODE=0, SET=1<<0, GET=1<<1, WATCH=1<<2 | GET, ACTION=1<<3, HELP=1<<4};
 
 static const char *msg_str[NMSG] = { "DEBUG", "INFO", "WARNING", "ERROR" };
 
@@ -128,7 +128,7 @@ void
 simple_ipc_output_title(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, const char* title)
 {
    //say(INFO, "dwl_ipc_output_title\n"); 
-   if(!(mode&GET && flag_client && (!strcmp(arg, "title")||!strcmp(arg, "all")))) return;
+   if(!(mode&GET && flag_client)) return;
    
    say(INFO, " |--> focused client title: %s\n", title);
 }
@@ -137,7 +137,7 @@ void
 simple_ipc_output_appid(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, const char* appid)
 {
    //say(INFO, "dwl_ipc_output_appid\n"); 
-   if(!(mode&GET && flag_client && (!strcmp(arg, "appid")||!strcmp(arg, "all")))) return;
+   if(!(mode&GET && flag_client)) return;
    say(INFO, " |--> focused client appid: %s\n", appid);
 }
 */
@@ -145,7 +145,7 @@ void
 simple_ipc_output_fullscreen(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output, uint32_t is_fullscreen)
 {
    //say(INFO, "dwl_ipc_output_fullscreen\n"); 
-   if(!(mode&GET && flag_client && (!strcmp(arg, "fullscreen")||!strcmp(arg, "all")))) return;
+   if(!(mode&GET && flag_client)) return;
    char* output_name = data;
    if(output_name) say(INFO, "%s ", output_name);
    printf("fullscreen %u\n", is_fullscreen);
@@ -155,7 +155,7 @@ void
 simple_ipc_output_frame(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output)
 {
    if(mode!=SET) return;
-
+   /*
    if(flag_output) {
       char new_arg[16];
       strcpy(new_arg, "output_");
@@ -166,6 +166,7 @@ simple_ipc_output_frame(void *data, struct zdwl_ipc_output_v2 *dwl_ipc_output)
       wl_display_flush(display);
       return;
    }
+   */
    if(flag_client) {
       uint32_t new_tag = (1<<(atoi(arg)-1));
       zdwl_ipc_output_v2_set_client_tags(dwl_ipc_output, ~focused_tag, new_tag);
@@ -285,37 +286,44 @@ main(int argc, char **argv)
       if(!strcmp(iarg, "--get"))    mode = GET;
       if(!strcmp(iarg, "--watch"))  mode = WATCH;
       if(!strcmp(iarg, "--action")) mode = ACTION;
+      if(!strcmp(iarg, "--help"))   mode = HELP;
    }
    if(mode==NOMODE) say(ERROR, "No mode selected!\n");
+   if(mode==HELP) {
+      say(INFO, "Usage: simplewc-msg --set [tag .+-^][client tag_n]\n");
+      say(INFO, "                   (--get|--watch) (tagcount|output|tag|client)\n");
+      say(INFO, "                    --action (quit|lock|reconfig)\n");
+      return EXIT_SUCCESS;
+   }
    
    // second pass - get the arguments
    for(int i=2; i<argc; i++){
       char* iarg = argv[i];
       if(mode==SET){
-         if(!strcmp(iarg, "--client") && ((i+1)<argc)){
+         if(!strcmp(iarg, "client") && ((i+1)<argc)){
             flag_client = true;
             sprintf(arg, argv[++i]);
          }
-         if(!strcmp(iarg, "--tag") && ((i+1)<argc)){
+         if(!strcmp(iarg, "tag") && ((i+1)<argc)){
             flag_tag = true;
             sprintf(arg, argv[++i]);
          }
-         if(!strcmp(iarg, "--output") && ((i+1)<argc)){
+         if(!strcmp(iarg, "output") && ((i+1)<argc)){
             flag_output = true;
             sprintf(arg, argv[++i]);
          }
       } else if(mode==GET || mode==WATCH) {
-         if(!strcmp(iarg, "--tagcount")){
+         if(!strcmp(iarg, "tagcount")){
             flag_tagcount = true;
          }
-         if(!strcmp(iarg, "--output")){
+         if(!strcmp(iarg, "output")){
             flag_output = true;
          }
-         if(!strcmp(iarg, "--client")){
+         if(!strcmp(iarg, "client")){
             flag_client = true;
-            sprintf(arg, ((i+1)<argc) ? argv[++i]:"all");
+            //sprintf(arg, ((i+1)<argc) ? argv[++i]:"all");
          }
-         if(!strcmp(iarg, "--tag")){
+         if(!strcmp(iarg, "tag")){
             flag_tag = true;
          }
       } else if(mode==ACTION) {

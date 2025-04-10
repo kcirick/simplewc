@@ -31,7 +31,7 @@ void new_output_notify(struct wl_listener *, void *);
 void output_layout_change_notify(struct wl_listener *, void *); 
 
 struct simple_output* get_output_at(double, double);
-void set_output_state(bool);
+//void set_output_state(bool);
 
 void arrange_output(struct simple_output*);
 
