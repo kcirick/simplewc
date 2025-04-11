@@ -30,7 +30,7 @@ v0.1
 
 ### Usage
 
-    > simplewc [--config file][--start cmd][--debug][--version][--help]
+    > simplewc [--config file][--start cmd][--debug|--info][--version][--help]
 
     > simplewc-msg --set [tag .+-^][client tag_n]
                   (--get|--watch) (tagcount|output|tag|client)
@@ -43,10 +43,11 @@ v0.1
     > sudo ninja -C build install
 
  - Build dependencies:
-   - wlroots-0.18
+   - wlroots
    - libxkbcommon (usually a dependency of wlroots)
    - libinput (usually a dependency of wlroots)
    - xwayland (optional)
+   - libxcb (optional - for xwayland)
 
 ### Configuration
 
@@ -66,10 +67,12 @@ Default configuration file read from `$HOME/.config/simplewc/configrc`, and allo
 Please use [Github Issues Tracker][ghit] to report bugs and issues.
 
   - 0.3 (Work in progress)
-    - Goal: Better support for multihead; Continue to improve the compositor
+    - Goal: Better support for multihead and fullscreen; Continue to improve the compositor
     - Uses wlroots v0.18
     - Improved support for multihead
+    - Uses the same tagset across all outputs
     - Added fullscreen support
+    - Added support for wlr_relative_pointer_manager_v1
   - 0.2 (2024-08-29) ([download][v02])
     - Goal: add in additional features
     - Uses wlroots v0.17

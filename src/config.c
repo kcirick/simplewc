@@ -83,8 +83,10 @@ readConfiguration(char* filename)
    wl_list_init(&g_config->mouse_bindings);
 
    FILE *f;
-   if(!(f=fopen(g_config->config_file_name, "r")))
-      say(ERROR, "Error reading file %s", g_config->config_file_name);
+   if(!(f=fopen(g_config->config_file_name, "r"))){
+      say(WARNING, "Error reading file %s", g_config->config_file_name);
+      return;
+   }
 
    char buffer[128];
    char id[32];

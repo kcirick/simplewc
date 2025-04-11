@@ -50,7 +50,7 @@ toggleClientFixed(struct simple_client *client)
    if(!client) return;
    
    if(client->fixed)
-      client->tag = client->output->current_tag;
+      client->tag = g_server->current_tag;
 
    client->fixed ^= 1;
 }
@@ -172,7 +172,7 @@ cycleClients(struct simple_output *output){
    wl_list_for_each(client, &selected->link, link) {
       if(&client->link == &g_server->clients)
          continue; // wrap past the sentinel node
-      if(VISIBLEON(client, output))
+      if(client->output==output && (client->fixed || (client->tag & g_server->visible_tags)))
          break;
    }
 
@@ -256,9 +256,10 @@ struct simple_client*
 get_top_client_from_output(struct simple_output* output, bool include_hidden)
 {
    struct simple_client *client;
+   if(!output) return NULL;
    wl_list_for_each(client, &g_server->clients, link) {
       if(!client || &client->link == &g_server->clients) continue; 
-      if((include_hidden || client->visible) && VISIBLEON(client, output))
+      if((include_hidden || client->visible) && (client->fixed || (client->tag & g_server->visible_tags)))
          return client;
    }
    return NULL;
@@ -391,7 +392,7 @@ update_border_geometry(struct simple_client *client) {
    wlr_xdg_surface_get_geometry(client->xdg_surface, &xdg_geom);
    client->geom.width = xdg_geom.width;
    client->geom.height = xdg_geom.height;
-   
+
    //borders
    int bw = g_config->border_width;
    if(client->fullscreen) bw = 0;
@@ -412,6 +413,8 @@ update_border_geometry(struct simple_client *client) {
 void 
 set_client_geometry(struct simple_client *client) 
 {
+   say(DEBUG, "size = %dx%d+%d+%d", client->geom.width, client->geom.height, client->geom.x, client->geom.y);
+   client->resize_requested = 1;
    if(client->type==XDG_SHELL_CLIENT){
       wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
       wlr_scene_node_set_position(&client->scene_surface_tree->node, 0, 0);
@@ -424,7 +427,6 @@ set_client_geometry(struct simple_client *client)
          client->geom.x, client->geom.y, client->geom.width, client->geom.height);
 #endif
    }
-   client->resize_requested = 1;
 }
 
 void 
@@ -550,7 +552,7 @@ map_notify(struct wl_listener *listener, void *data)
    }
 
    client->output = op;
-   client->tag = op->current_tag;
+   client->tag = g_server->current_tag;
    client->visible = true;
    client->fixed = false;
    client->urgent = false;

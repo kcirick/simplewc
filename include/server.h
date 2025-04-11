@@ -103,6 +103,10 @@ struct simple_server {
    // background layer
    struct wlr_scene_rect *root_bg;
 
+   // tags
+   unsigned int current_tag;
+   unsigned int visible_tags;
+
    struct simple_client *grabbed_client;
    struct client_outline *grabbed_client_outline;
    double grab_x, grab_y;

@@ -15,9 +15,6 @@ struct simple_output {
    struct wl_listener request_state;
    struct wl_listener destroy;
 
-   unsigned int current_tag;
-   unsigned int visible_tags;
-
    struct wlr_session_lock_surface_v1 *lock_surface;
    struct wl_listener lock_surface_destroy;
 
@@ -31,7 +28,6 @@ void new_output_notify(struct wl_listener *, void *);
 void output_layout_change_notify(struct wl_listener *, void *); 
 
 struct simple_output* get_output_at(double, double);
-//void set_output_state(bool);
 
 void arrange_output(struct simple_output*);
 

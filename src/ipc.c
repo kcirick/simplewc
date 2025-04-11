@@ -109,7 +109,7 @@ ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
 	struct simple_output *output = ipc_output->output;
 	struct simple_client *c, *focused;
 	int tagmask, state, numclients, focused_client, tag;
-   char *title, *appid;
+   char *title;
 	
    focused = get_top_client_from_output(output, false);
 	zdwl_ipc_output_v2_send_active(ipc_output->resource, output == g_server->cur_output);
@@ -118,12 +118,12 @@ ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
    for (tag = 0 ; tag < g_config->n_tags; tag++) {
       numclients = state = focused_client = 0;
 		tagmask = 1 << tag;
-		if ((tagmask & output->visible_tags) != 0)
+		if ((tagmask & g_server->visible_tags) != 0)
 			state |= ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE;
 
 		wl_list_for_each(c, &g_server->clients, link) {
-			if (c->output != output)
-				continue;
+			//if (c->output != output)
+			//	continue;
 			if (!(c->tag & tagmask))
 				continue;
 			if (c == focused)
@@ -136,11 +136,11 @@ ipc_output_printstatus_to(struct simple_ipc_output *ipc_output)
 		zdwl_ipc_output_v2_send_tag(ipc_output->resource, tag, state, numclients, focused_client);
 	}
 	title = focused ? get_client_title(focused) : "";
-	appid = focused ? get_client_appid(focused) : "";
+//	appid = focused ? get_client_appid(focused) : "";
    ////////////////////////////////////////////////
 
 	zdwl_ipc_output_v2_send_title(ipc_output->resource, title ? title : "broken");
-	zdwl_ipc_output_v2_send_appid(ipc_output->resource, appid ? appid : "broken");
+	//zdwl_ipc_output_v2_send_appid(ipc_output->resource, appid ? appid : "broken");
 	//if (wl_resource_get_version(ipc_output->resource) >= ZDWL_IPC_OUTPUT_V2_FULLSCREEN_SINCE_VERSION) {
 	//	zdwl_ipc_output_v2_send_fullscreen(ipc_output->resource, focused ? focused->isfullscreen : 0);
 	//}
@@ -192,13 +192,13 @@ ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint
 
 	output = ipc_output->output;
 
-	if (!newtags || newtags == output->visible_tags)
+	if (!newtags || newtags == g_server->visible_tags)
 		return;
 	//if (toggle_tagset)
 	//	monitor->seltags ^= 1;
 
-	output->visible_tags = newtags;
-   if(toggle_tagset) output->current_tag = newtags;
+	g_server->visible_tags = newtags;
+   if(toggle_tagset) g_server->current_tag = newtags;
 	arrange_output(output);
 	print_server_info();
 }

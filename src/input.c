@@ -134,7 +134,7 @@ static void
 process_cursor_move(uint32_t time) 
 {
    struct simple_client *client = g_server->grabbed_client;
-   if(!client) return;
+   if(!client || client->fullscreen) return;
 
    client->geom.x = g_server->cursor->x - g_server->grab_x;
    client->geom.y = g_server->cursor->y - g_server->grab_y;
@@ -146,7 +146,7 @@ static void
 process_cursor_resize(uint32_t time) 
 {
    struct simple_client *client = g_server->grabbed_client;
-   if(!client) return;
+   if(!client || client->fullscreen) return;
    
    double delta_x = g_server->cursor->x - g_server->grab_x;
    double delta_y = g_server->cursor->y - g_server->grab_y;
@@ -230,11 +230,6 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
       }
    }
 
-   /*
-   if(time>0 && client && ctype!=LAYER_SHELL_CLIENT && ctype_focused!=LAYER_SHELL_CLIENT 
-      && client != focused_client && g_config->sloppy_focus && !g_server->seat->drag)
-      focus_client(client, false);
-   */
    if(time>0 && client && ctype!=LAYER_SHELL_CLIENT && ctype_focused!=LAYER_SHELL_CLIENT 
       && client != focused_client && g_config->focus_type>0 && !g_server->seat->drag)
       focus_client(client, g_config->focus_type==RAISE);

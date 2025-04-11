@@ -96,9 +96,9 @@ setCurrentTag(int tag, bool toggle)
 {
    struct simple_output* output = g_server->cur_output;
    if(toggle)
-      output->visible_tags ^= TAGMASK(tag);
+      g_server->visible_tags ^= TAGMASK(tag);
    else 
-      output->visible_tags = output->current_tag = TAGMASK(tag);
+      g_server->visible_tags = g_server->current_tag = TAGMASK(tag);
 
    focus_client(get_top_client_from_output(output, false), true);
    //arrange_output(output);
@@ -115,7 +115,7 @@ tileTag()
    // first count the number of clients
    int n=0;
    wl_list_for_each(client, &g_server->clients, link){
-      if(!(client->visible && VISIBLEON(client, output))) continue;
+      if(!(client->visible && (client->fixed || (client->tag & g_server->visible_tags)))) continue;
       n++;
    }
 
@@ -125,7 +125,7 @@ tileTag()
    int i=0;
    struct wlr_box new_geom;
    wl_list_for_each(client, &g_server->clients, link){
-      if(!(client->visible && VISIBLEON(client, output))) continue;
+      if(!(client->visible && (client->fixed || (client->tag & g_server->visible_tags)))) continue;
       
       if(i==0) { // master window
          new_geom.x = output->usable_area.x + gap_width + bw;
@@ -160,7 +160,7 @@ print_server_info()
       ipc_output_printstatus(output);
       say(DEBUG, "output %s", output->wlr_output->name);
       say(DEBUG, " -> cur_output = %u", output == g_server->cur_output);
-      say(DEBUG, " -> tag = vis:%u / cur:%u", output->visible_tags, output->current_tag);
+      say(DEBUG, " -> tag = vis:%u / cur:%u", g_server->visible_tags, g_server->current_tag);
       wl_list_for_each(client, &g_server->clients, link) {
          struct simple_client* focused_client=NULL;
          get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
@@ -516,6 +516,9 @@ prepareServer()
    g_server->xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(g_server->display);
    LISTEN(&g_server->xdg_decoration_manager->events.new_toplevel_decoration, &g_server->new_decoration, new_decoration_notify);
 
+   //set default tag
+   g_server->current_tag = TAGMASK(0);
+   g_server->visible_tags = TAGMASK(0);
 
    // Set up IPC interface
    wl_global_create(g_server->display, &zdwl_ipc_manager_v2_interface, DWL_IPC_VERSION, NULL, ipc_manager_bind);

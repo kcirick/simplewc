@@ -28,10 +28,12 @@ arrange_output(struct simple_output* output)
    wlr_scene_node_set_enabled(&output->fullscreen_bg->node, focused_client && focused_client->fullscreen);
 
    int n=0;
+   bool is_client_visible=false;
    wl_list_for_each(client, &g_server->clients, link) {
-      if(client->visible && VISIBLEON(client, output)) n++;
+      is_client_visible = (client->visible && (client->fixed || (client->tag & g_server->visible_tags)));
+      if(is_client_visible) n++;
       set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
-      wlr_scene_node_set_enabled(&client->scene_tree->node, client->visible && VISIBLEON(client, output));
+      wlr_scene_node_set_enabled(&client->scene_tree->node, is_client_visible);
    }
 
    if(focused_client && focused_client->fullscreen)
@@ -63,23 +65,6 @@ get_output_at(double x, double y)
    }
    return NULL;
 }
-
-/*
-void
-set_output_state(bool state)
-{
-   struct simple_output *output;
-   wl_list_for_each(output, &g_server->outputs, link) {
-      if(!output) continue;
-
-      struct wlr_output_state wlr_state = {0};
-
-      wlr_output_state_set_enabled(&wlr_state, 
-            state ? ZWLR_OUTPUT_POWER_V1_MODE_ON : ZWLR_OUTPUT_POWER_V1_MODE_OFF);
-      wlr_output_commit_state(output->wlr_output, &wlr_state);
-   }
-}
-*/
 
 //--- Output notify functions --------------------------------------------
 static void 
@@ -140,6 +125,14 @@ output_destroy_notify(struct wl_listener *listener, void *data)
    wl_list_remove(&output->destroy.link);
    wl_list_remove(&output->link);
 
+   // Move clients to the previous output
+   struct simple_client * client;
+   wl_list_for_each(client, &g_server->clients, link) {
+      if(client->geom.x > output->usable_area.width){
+         client->geom.x = client->geom.x - output->usable_area.width;
+         set_client_geometry(client);
+      }
+   }
    wlr_scene_node_destroy(&output->fullscreen_bg->node);
    free(output);
 }
@@ -148,6 +141,7 @@ output_destroy_notify(struct wl_listener *listener, void *data)
 void 
 output_layout_change_notify(struct wl_listener *listener, void *data) 
 {
+   // Called when the output layout changes: e.g. adding/removing a monitor
    say(DEBUG, "output_layout_change_notify");
 
    struct wlr_output_configuration_v1 *config = wlr_output_configuration_v1_create();
@@ -156,6 +150,7 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
       say(ERROR, "wlr_output_configuration_v1_create failed");
 
    struct simple_output *output;
+
    wl_list_for_each(output, &g_server->outputs, link) {
       if(!output->wlr_output->enabled) continue;
 
@@ -173,6 +168,9 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
       memset(&output->usable_area, 0, sizeof(output->usable_area));
       memset(&output->full_area, 0, sizeof(output->full_area));
       output->usable_area = output->full_area = box;
+
+      arrange_layers(output);
+      arrange_output(output);
 
       output->gamma_lut_changed = true;
       config_head->state.x = box.x;
@@ -239,9 +237,6 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrOverlay]->node);
    wlr_scene_node_raise_to_top(&g_server->layer_tree[LyrLock]->node);
 
-   //set default tag
-   output->current_tag = TAGMASK(0);
-   output->visible_tags = TAGMASK(0);
 
    struct wlr_output_layout_output *l_output =
       wlr_output_layout_add_auto(g_server->output_layout, wlr_output);

@@ -1,12 +1,18 @@
 TODO
-	* : Support multi-monitor setup
 	* : Improve simplewc-msg functionality
-	* : Use same tags across all outputs
 
 v0.2 -> v0.3 Changes
 2025-04-10:
-	* src/config.c: sloppy_focus to focus_type, support none, sloppy, and raise
+	* main.c: Use wlr_log to print messages. Add info log level in addition to debug
+	* include/globals.h: remove VISIBLEON macro
+	* include/server.h: visible_tags and current_tag are now property of
+	server, not output. All outputs now show the same tagset
+	* src/config.c: sloppy_focus to focus_type, supports none, sloppy, and raise
+	* src/config.c: don't exit without a default config
 	* src/output.c: remove output-on/off function. Tools like wlopm do it better
+	* src/output.c: Move clients upon removal of an output in
+	output_destroy_notify()
+	* src/input.c: Disable move/resize for fullscreen client
 	* util/simplewc-msg.c: add --help flag
 
 2025-04-09:
@@ -14,7 +20,7 @@ v0.2 -> v0.3 Changes
 	* src/client.c: Adding toggleClientFullscreen() and setClientFullscreen()
 	which is also referenced by fullscreen_notify()
 	* src/input.c: Adding wlr_relative_pointer_manager_v1
-	* src/output.c: Add fullscreen support, e.g. LyrFS
+	* src/output.c: Add fullscreen layer support, e.g. LyrFS
 
 2025-03-04:
 	* main.c: Use getopt_long for command line arguments. keep track of startup

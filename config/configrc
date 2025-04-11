@@ -37,7 +37,7 @@ touchpad_tap_click = false
 
 #--- Key Bindings -----
 KEY = A+q QUIT 0
-#KEY = A+l LOCK lock_cmd 
+#KEY = A+l LOCK 0 
 #--- Spawns
 KEY = S+A+Return SPAWN foot
 #KEY = XF86AudioMute SPAWN pactl set-sink-mute @DEFAULT_SINK@ toggle

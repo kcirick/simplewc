@@ -29,16 +29,13 @@ struct simple_config* g_config;
 void 
 say(int level, const char* message, ...) 
 {
-   if(level==DEBUG && info_level!=WLR_DEBUG) return;
-
    char buffer[256];
    va_list args;
    va_start(args, message);
    vsnprintf(buffer, 256, message, args);
    va_end(args);
 
-   printf("SimpleWC [%s]: %s\n", msg_str[level], buffer);
-   //wlr_log(WLR_INFO, " [%s]: %s", msg_str[level], buffer);
+   wlr_log(level==DEBUG?WLR_DEBUG:WLR_INFO, CRESET"[%s]: %s", msg_str[level], buffer);
 
    if(level==ERROR) exit(EXIT_FAILURE);
 }
@@ -50,22 +47,6 @@ spawn(char* cmd)
    if(!(sh=getenv("SHELL"))) sh = (char*)"/bin/sh";
 
    say(DEBUG, "Spawn %s", cmd);
-   /*
-   pid_t pid = fork();
-   if(pid==0){
-      pid_t child;
-      setsid();
-      sigset_t set;
-      sigemptyset(&set);
-      sigprocmask(SIG_SETMASK, &set, NULL);
-      if((child=fork())==0){
-         execl(sh, sh, "-c", cmd, (char*) NULL);
-         exit(0);
-      }
-      exit(0);
-   }
-   //waitpid(pid, NULL, 0);
-   */
    // from dwl:
    pid_t pid = fork();
    if(pid==0) {
@@ -106,12 +87,13 @@ main(int argc, char **argv)
    static struct option long_options[] = {
       { "config",    required_argument,   0, 'c' },
       { "start",     required_argument,   0, 's' },
+      { "info",      no_argument,         0, 'i' },
       { "debug",     no_argument,         0, 'd' },
       { "version",   no_argument,         0, 'v' },
       { "help",      no_argument,         0, 'h' },
       { 0, 0, 0, 0 }
     };
-   while ((opt = getopt_long(argc, argv,"c:s:dvh", 
+   while ((opt = getopt_long(argc, argv,"c:s:divh", 
                long_options, &long_index )) != -1) {
       switch (opt) {
          case 'c' : 
@@ -123,11 +105,14 @@ main(int argc, char **argv)
          case 'd' : 
             info_level = WLR_DEBUG; 
             break;
+         case 'i' :
+            info_level = WLR_INFO;
+            break;
          case 'v' : 
-            say(INFO, "Version-"VERSION);
+            printf("simplewc v"VERSION"\n");
             exit(EXIT_SUCCESS);
          default: 
-            say(INFO, "Usage: %s [--config file][--start cmd][--debug][--version][--help]", argv[0]);
+            printf("Usage: simplewc [--config file][--start cmd][--debug|--info][--version][--help]\n");
             exit(EXIT_SUCCESS);
         }
     }
