@@ -292,7 +292,7 @@ main(int argc, char **argv)
    if(mode==HELP) {
       say(INFO, "Usage: simplewc-msg --set [tag .+-^][client tag_n]\n");
       say(INFO, "                   (--get|--watch) (tagcount|output|tag|client)\n");
-      say(INFO, "                    --action (quit|lock|reconfig)\n");
+      say(INFO, "                    --action (quit|reconfig)\n");
       return EXIT_SUCCESS;
    }
    

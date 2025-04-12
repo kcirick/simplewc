@@ -139,6 +139,9 @@ process_cursor_move(uint32_t time)
    client->geom.x = g_server->cursor->x - g_server->grab_x;
    client->geom.y = g_server->cursor->y - g_server->grab_y;
 
+   client->output = get_output_at(g_server->cursor->x, g_server->cursor->y);
+   client->tag = client->output->current_tag;
+
    set_client_geometry(client);
 }
 
@@ -200,6 +203,8 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
             g_server->relative_pointer_manager, g_server->seat, (uint64_t)time*1000,
             dx, dy, dx_unaccel, dy_unaccel);
    }
+
+   g_server->cur_output = get_output_at(g_server->cursor->x, g_server->cursor->y);
 
    // update drag icon's position
    wlr_scene_node_set_position(&g_server->drag_icon->node, g_server->cursor->x, g_server->cursor->y);

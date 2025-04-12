@@ -30,7 +30,8 @@ arrange_output(struct simple_output* output)
    int n=0;
    bool is_client_visible=false;
    wl_list_for_each(client, &g_server->clients, link) {
-      is_client_visible = (client->visible && (client->fixed || (client->tag & g_server->visible_tags)));
+      if(client->output!=output) continue;
+      is_client_visible = (client->visible && (client->fixed || (client->tag & output->visible_tags)));
       if(is_client_visible) n++;
       set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
       wlr_scene_node_set_enabled(&client->scene_tree->node, is_client_visible);
@@ -132,6 +133,8 @@ output_destroy_notify(struct wl_listener *listener, void *data)
          client->geom.x = client->geom.x - output->usable_area.width;
          set_client_geometry(client);
       }
+      struct simple_output *new_op = get_output_at(client->geom.x, client->geom.y);
+      if(new_op) client->output = new_op;
    }
    wlr_scene_node_destroy(&output->fullscreen_bg->node);
    free(output);
@@ -251,6 +254,10 @@ new_output_notify(struct wl_listener *listener, void *data)
    //memset(&output->full_area, 0, sizeof(output->full_area));
    //output->full_area = geom;
    
+   //set default tag
+   output->current_tag = TAGMASK(0);
+   output->visible_tags = TAGMASK(0);
+
    wlr_scene_node_set_position(&g_server->root_bg->node, geom.x, geom.y);
    wlr_scene_rect_set_size(g_server->root_bg, geom.width, geom.height);
    wlr_scene_node_set_position(&g_server->locked_bg->node, geom.x, geom.y);

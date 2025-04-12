@@ -34,7 +34,7 @@ v0.1
 
     > simplewc-msg --set [tag .+-^][client tag_n]
                   (--get|--watch) (tagcount|output|tag|client)
-                   --action (quit|lock|reconfig)
+                   --action (quit|reconfig)
 
 ### Build
 
@@ -55,7 +55,6 @@ Default configuration file read from `$HOME/.config/simplewc/configrc`, and allo
 
  - window management behaviour: ( # of tags, tile gaps, movement steps etc )
  - window border width and colour
- - lock command
  - autostart script (e.g. set background, invoke status-bar, launch idle-inhibitor)
  - keyboard layout and options 
  - keybinds

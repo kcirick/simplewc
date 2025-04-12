@@ -22,9 +22,6 @@ border_colour_outline = #FFFFFF
 # 0 - none / 1 - sloppy / 2 - raise
 focus_type = 1
 
-#--- Command for locking -----
-#lock_cmd = swaylock -c 000000
-
 #--- Autostart script  -----
 #autostart = ~/.config/simplewc/autostart.sh 
 
@@ -37,7 +34,6 @@ touchpad_tap_click = false
 
 #--- Key Bindings -----
 KEY = A+q QUIT 0
-#KEY = A+l LOCK 0 
 #--- Spawns
 KEY = S+A+Return SPAWN foot
 #KEY = XF86AudioMute SPAWN pactl set-sink-mute @DEFAULT_SINK@ toggle

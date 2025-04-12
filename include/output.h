@@ -11,6 +11,10 @@ struct simple_output {
 
    struct wlr_scene_rect *fullscreen_bg;
 
+   // tags
+   unsigned int current_tag;
+   unsigned int visible_tags;
+
    struct wl_listener frame;
    struct wl_listener request_state;
    struct wl_listener destroy;

@@ -50,7 +50,7 @@ toggleClientFixed(struct simple_client *client)
    if(!client) return;
    
    if(client->fixed)
-      client->tag = g_server->current_tag;
+      client->tag = client->output->current_tag;
 
    client->fixed ^= 1;
 }
@@ -172,7 +172,7 @@ cycleClients(struct simple_output *output){
    wl_list_for_each(client, &selected->link, link) {
       if(&client->link == &g_server->clients)
          continue; // wrap past the sentinel node
-      if(client->output==output && (client->fixed || (client->tag & g_server->visible_tags)))
+      if(client->output==output && (client->fixed || (client->tag & output->visible_tags)))
          break;
    }
 
@@ -259,7 +259,7 @@ get_top_client_from_output(struct simple_output* output, bool include_hidden)
    if(!output) return NULL;
    wl_list_for_each(client, &g_server->clients, link) {
       if(!client || &client->link == &g_server->clients) continue; 
-      if((include_hidden || client->visible) && (client->fixed || (client->tag & g_server->visible_tags)))
+      if((include_hidden || client->visible) && client->output==output && (client->fixed || (client->tag & output->visible_tags)))
          return client;
    }
    return NULL;
@@ -552,7 +552,7 @@ map_notify(struct wl_listener *listener, void *data)
    }
 
    client->output = op;
-   client->tag = g_server->current_tag;
+   client->tag = op->current_tag;
    client->visible = true;
    client->fixed = false;
    client->urgent = false;

@@ -65,7 +65,6 @@ set_defaults()
    colour2rgba("#FFFFFF", g_config->border_colour[OUTLINE]);
 
    g_config->autostart_script[0] = '\0';
-   g_config->lock_cmd[0] = '\0';
    g_config->xkb_layout[0] = '\0';
    g_config->xkb_options[0] = '\0';
 }
@@ -120,8 +119,6 @@ readConfiguration(char* filename)
       if(!strcmp(id, "border_colour_marked"))   colour2rgba(value, g_config->border_colour[MARKED]);
       if(!strcmp(id, "border_colour_fixed"))    colour2rgba(value, g_config->border_colour[FIXED]);
       if(!strcmp(id, "border_colour_outline"))  colour2rgba(value, g_config->border_colour[OUTLINE]);
-
-      if(!strcmp(id, "lock_cmd"))      strncpy(g_config->lock_cmd, value, sizeof g_config->lock_cmd);
 
       if(!strcmp(id, "autostart"))     strncpy(g_config->autostart_script, value, sizeof g_config->autostart_script);
 

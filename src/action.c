@@ -17,9 +17,6 @@ key_function(struct keymap *keymap)
    //--- QUIT -----
    if(keymap->keyfn==QUIT)    wl_display_terminate(g_server->display);
    
-   //--- LOCK -----
-   if(keymap->keyfn==LOCK)    spawn(g_config->lock_cmd);
-
    //--- SPAWN -----
    if(keymap->keyfn==SPAWN)   spawn(keymap->argument);
 
@@ -88,7 +85,6 @@ process_ipc_action(const char* action)
 {
    if(!strcmp(action, "test"))      say(INFO, "Action test");
    if(!strcmp(action, "quit"))      wl_display_terminate(g_server->display);
-   if(!strcmp(action, "lock"))      spawn(g_config->lock_cmd);
    if(!strcmp(action, "reconfig"))  reloadConfiguration();
 
    //if(!strcmp(action, "output_off"))   set_output_state(false);

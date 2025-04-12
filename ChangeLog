@@ -5,9 +5,8 @@ v0.2 -> v0.3 Changes
 2025-04-10:
 	* main.c: Use wlr_log to print messages. Add info log level in addition to debug
 	* include/globals.h: remove VISIBLEON macro
-	* include/server.h: visible_tags and current_tag are now property of
-	server, not output. All outputs now show the same tagset
 	* src/config.c: sloppy_focus to focus_type, supports none, sloppy, and raise
+	* src/config.c: remove lock_cmd. Don't need it
 	* src/config.c: don't exit without a default config
 	* src/output.c: remove output-on/off function. Tools like wlopm do it better
 	* src/output.c: Move clients upon removal of an output in

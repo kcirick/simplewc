@@ -55,7 +55,6 @@ struct simple_config {
    float background_colour[4];
    float border_colour[NBORDERCOL][4];
 
-   char lock_cmd[64];
    char autostart_script[64];
 
    char xkb_layout[32];
