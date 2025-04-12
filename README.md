@@ -69,7 +69,6 @@ Please use [Github Issues Tracker][ghit] to report bugs and issues.
     - Goal: Better support for multihead and fullscreen; Continue to improve the compositor
     - Uses wlroots v0.18
     - Improved support for multihead
-    - Uses the same tagset across all outputs
     - Added fullscreen support
     - Added support for wlr_relative_pointer_manager_v1
   - 0.2 (2024-08-29) ([download][v02])
