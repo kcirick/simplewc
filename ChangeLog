@@ -1,6 +1,11 @@
 TODO
 	* : Improve simplewc-msg functionality
 
+v0.3 -> v0.4 Changes
+2025-04-12
+   * : Moving onto v0.4
+	* README.md: Update for v0.4
+
 v0.2 -> v0.3 Changes
 2025-04-10:
 	* main.c: Use wlr_log to print messages. Add info log level in addition to debug

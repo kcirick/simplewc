@@ -65,8 +65,11 @@ Default configuration file read from `$HOME/.config/simplewc/configrc`, and allo
 
 Please use [Github Issues Tracker][ghit] to report bugs and issues.
 
-  - 0.3 (Work in progress)
-    - Goal: Better support for multihead and fullscreen; Continue to improve the compositor
+  - 0.4 (Work in progress)
+    - Goal: Continue to improve the compositor, optimize for efficiency.
+    - Uses wlroots v0.18
+  - 0.3 (2025-04-12) ([download][v03])
+    - Goal: Better support for multihead and fullscreen
     - Uses wlroots v0.18
     - Improved support for multihead
     - Added fullscreen support
@@ -88,5 +91,6 @@ Please use [Github Issues Tracker][ghit] to report bugs and issues.
 
 [v01]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.1.tar.gz
 [v02]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.2.tar.gz
+[v03]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.3.tar.gz
 [ghit]: https://github.com/kcirick/simplewc/issues
 

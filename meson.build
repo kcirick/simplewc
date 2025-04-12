@@ -2,7 +2,7 @@
 project (
   'simplewc',
   'c', 
-  version: '0.3',
+  version: '0.4',
   license: 'MIT',
   meson_version: '>=0.59.0',
 )
