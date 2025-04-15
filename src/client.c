@@ -643,6 +643,9 @@ destroy_notify(struct wl_listener *listener, void *data)
    struct simple_client *client = wl_container_of(listener, client, destroy);
 //   struct simple_output * output = g_server->cur_output;
 
+   if(client->fullscreen)
+      wlr_scene_node_set_enabled(&client->output->fullscreen_bg->node, 0);
+
    wl_list_remove(&client->destroy.link);
    wl_list_remove(&client->request_fullscreen.link);
    if(client->type==XDG_SHELL_CLIENT){
