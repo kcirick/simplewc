@@ -40,6 +40,7 @@ struct simple_client {
    bool fixed;
    bool urgent;
    bool fullscreen;
+   bool maximized;
 
    bool visible;
 
@@ -55,11 +56,12 @@ void sendClientToTag(struct simple_client*, int);
 void toggleClientFixed(struct simple_client*);
 void toggleClientVisible(struct simple_client*);
 void toggleClientFullscreen(struct simple_client*);
-void setClientFullscreen(struct simple_client*, int);
+void toggleClientMaximize(struct simple_client*);
+//void setClientFullscreen(struct simple_client*, int);
 void cycleClients(struct simple_output*);
 void killClient(struct simple_client*);
 void tileClient(struct simple_client*, enum Direction);
-void maximizeClient(struct simple_client*);
+//void maximizeClient(struct simple_client*);
 
 char * get_client_title(struct simple_client*);
 char * get_client_appid(struct simple_client*);

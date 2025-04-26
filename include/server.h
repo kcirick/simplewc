@@ -60,8 +60,13 @@ struct simple_server {
    struct wl_listener new_input;
 
    struct wlr_cursor *cursor;
+   bool cursor_hidden;
    struct wlr_xcursor_manager *cursor_manager;
    struct wlr_relative_pointer_manager_v1 *relative_pointer_manager;
+   struct wlr_pointer_constraints_v1 *pointer_constraints;
+   struct wlr_pointer_constraint_v1 *active_constraint;
+   struct wl_listener new_pointer_constraint;
+
    enum CursorMode cursor_mode;
    struct wl_listener cursor_motion;
    struct wl_listener cursor_motion_abs;

@@ -44,8 +44,8 @@ key_function(struct keymap *keymap)
       if(!strcmp(keymap->argument, "toggle_fixed"))   toggleClientFixed(client);
       if(!strcmp(keymap->argument, "toggle_visible")) toggleClientVisible(client);
       if(!strcmp(keymap->argument, "toggle_fullscreen")) toggleClientFullscreen(client);
+      if(!strcmp(keymap->argument, "toggle_maximize"))   toggleClientMaximize(client);
       if(!strcmp(keymap->argument, "kill"))           killClient(client);
-      if(!strcmp(keymap->argument, "maximize"))       maximizeClient(client);
       if(!strcmp(keymap->argument, "tile_left"))      tileClient(client, LEFT);
       if(!strcmp(keymap->argument, "tile_right"))     tileClient(client, RIGHT);
       if(!strcmp(keymap->argument, "move")){

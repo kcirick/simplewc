@@ -26,8 +26,8 @@ struct simple_server* g_server;
 struct simple_config* g_config;
 
 //------------------------------------------------------------------------
-void 
-say(int level, const char* message, ...) 
+void
+say(int level, const char* message, ...)
 {
    char buffer[256];
    va_list args;
@@ -40,8 +40,8 @@ say(int level, const char* message, ...)
    if(level==ERROR) exit(EXIT_FAILURE);
 }
 
-pid_t 
-spawn(char* cmd) 
+pid_t
+spawn(char* cmd)
 {
    char *sh = NULL;
    if(!(sh=getenv("SHELL"))) sh = (char*)"/bin/sh";
@@ -58,15 +58,15 @@ spawn(char* cmd)
    return pid;
 }
 
-void 
-signal_handler(int sig) 
+void
+signal_handler(int sig)
 {
    if(sig == SIGCHLD) {
 #if XWAYLAND
       siginfo_t in;
-      while (  !waitid(P_ALL, 0, &in, WEXITED|WNOHANG|WNOWAIT) 
-               && in.si_pid
-               && (!g_server->xwayland || in.si_pid != g_server->xwayland->server->pid) )
+      while ( !waitid(P_ALL, 0, &in, WEXITED|WNOHANG|WNOWAIT)
+              && in.si_pid
+              && (!g_server->xwayland || in.si_pid != g_server->xwayland->server->pid) )
          waitpid(in.si_pid, NULL, 0);
 #else
       while (0 < waitpid(-1, NULL, WNOHANG));
@@ -76,8 +76,8 @@ signal_handler(int sig)
 }
 
 //--- Main function ------------------------------------------------------
-int 
-main(int argc, char **argv) 
+int
+main(int argc, char **argv)
 {
    char config_file[64] = { '\0' };
    char start_cmd[64] = { '\0' };
@@ -93,25 +93,24 @@ main(int argc, char **argv)
       { "help",      no_argument,         0, 'h' },
       { 0, 0, 0, 0 }
     };
-   while ((opt = getopt_long(argc, argv,"c:s:divh", 
-               long_options, &long_index )) != -1) {
+   while ((opt = getopt_long(argc, argv,"c:s:divh", long_options, &long_index )) != -1) {
       switch (opt) {
-         case 'c' : 
+         case 'c' :
             sprintf(config_file, optarg);
             break;
-         case 's' : 
+         case 's' :
             sprintf(start_cmd, optarg);
             break;
-         case 'd' : 
-            info_level = WLR_DEBUG; 
+         case 'd' :
+            info_level = WLR_DEBUG;
             break;
          case 'i' :
             info_level = WLR_INFO;
             break;
-         case 'v' : 
+         case 'v' :
             printf("simplewc v"VERSION"\n");
             exit(EXIT_SUCCESS);
-         default: 
+         default:
             printf("Usage: simplewc [--config file][--start cmd][--debug|--info][--version][--help]\n");
             exit(EXIT_SUCCESS);
         }
@@ -146,7 +145,7 @@ main(int argc, char **argv)
    if(!(g_server = calloc(1, sizeof(struct simple_server))))
       say(ERROR, "Cannot allocate g_server");
    prepareServer();
-   
+
    startServer();
 
    // Run autostarts and startup comand if defined
@@ -156,7 +155,7 @@ main(int argc, char **argv)
 
    // Run the main Wayland event loop
    wl_display_run(g_server->display);
-   
+
    cleanupServer();
 
    // clean up pid

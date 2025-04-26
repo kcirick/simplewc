@@ -2,8 +2,15 @@ TODO
 	* : Improve simplewc-msg functionality
 
 v0.3 -> v0.4 Changes
+2025-04-26
+	* meson.build: add pointer-constraints-unstable-v1 protocol 
+	* src/input.c: implement wlr_pointer_constraints_v1
+	* src/client.c: maximize client function changed to toggle_maximize, the
+	client geometry will revert back to previous upon toggle
+	* config/configrc: change maximize to toggle_maximize
+
 2025-04-12
-   * : Moving onto v0.4
+	* : Moving onto v0.4
 	* README.md: Update for v0.4
 
 v0.2 -> v0.3 Changes

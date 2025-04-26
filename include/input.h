@@ -12,6 +12,11 @@ struct simple_input {
    struct wl_listener destroy;
 };
 
+struct simple_pointer_constraint {
+   struct wlr_pointer_constraint_v1 *constraint;
+   struct wl_listener destroy;
+};
+
 void input_focus_surface(struct wlr_surface*);
 
 void input_init();

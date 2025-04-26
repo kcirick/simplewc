@@ -55,16 +55,6 @@ toggleClientFixed(struct simple_client *client)
    client->fixed ^= 1;
 }
 
-void
-toggleClientFullscreen(struct simple_client *client)
-{
-   if(!client) return;
-
-   client->fullscreen ^= 1;
-
-   setClientFullscreen(client, client->fullscreen);
-}
-
 void setClientFullscreen(struct simple_client *client, int fullscreen)
 {
    say(DEBUG, "setClientFullscreen");
@@ -97,23 +87,47 @@ void setClientFullscreen(struct simple_client *client, int fullscreen)
 }
 
 void
-maximizeClient(struct simple_client *client)
+toggleClientFullscreen(struct simple_client *client)
 {
    if(!client) return;
 
-   int gap_width = g_config->tile_gap_width;
-   int bw = g_config->border_width;
+   client->fullscreen ^= 1;
 
-   struct simple_output* output = client->output;
+   setClientFullscreen(client, client->fullscreen);
+}
 
-   struct wlr_box new_geom;
-   new_geom.x = output->usable_area.x + gap_width + bw;
-   new_geom.y = output->usable_area.y + gap_width + bw;
-   new_geom.width = output->usable_area.width - gap_width*2 - bw*2;
-   new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
-   
-   client->geom = new_geom;
-   set_client_geometry(client);
+void
+maximizeClient(struct simple_client *client, int maximize)
+{
+   if(!client) return;
+
+   if(maximize) {
+      client->prev_geom = client->geom;
+      int gap_width = g_config->tile_gap_width;
+      int bw = g_config->border_width;
+
+      struct wlr_box new_geom;
+      new_geom.x = client->output->usable_area.x + gap_width + bw;
+      new_geom.y = client->output->usable_area.y + gap_width + bw;
+      new_geom.width = client->output->usable_area.width - gap_width*2 - bw*2;
+      new_geom.height = client->output->usable_area.height - gap_width*2 - bw*2;
+
+      client->geom = new_geom;
+      set_client_geometry(client);
+   } else {
+      client->geom = client->prev_geom;
+      set_client_geometry(client);
+   }
+}
+
+void
+toggleClientMaximize(struct simple_client *client)
+{
+   if(!client) return;
+
+   client->maximized ^= 1;
+
+   maximizeClient(client, client->maximized);
 }
 
 void

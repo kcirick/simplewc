@@ -11,8 +11,10 @@
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_relative_pointer_v1.h>
+#include <wlr/types/wlr_pointer_constraints_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/edges.h>
+#include <wlr/util/region.h>
 
 #include "globals.h"
 #include "layer.h"
@@ -21,6 +23,57 @@
 #include "client.h"
 #include "action.h"
 #include "input.h"
+
+
+//--- Pointer Constraints ------------------------------------------------
+void
+cursor_constrain(struct wlr_pointer_constraint_v1 *constraint)
+{
+   if(g_server->active_constraint == constraint)
+      return;
+
+   if(g_server->active_constraint)
+      wlr_pointer_constraint_v1_send_deactivated(g_server->active_constraint);
+
+   g_server->active_constraint = constraint;
+   wlr_pointer_constraint_v1_send_activated(constraint);
+}
+
+void
+cursor_warp_to_hint(void)
+{
+   struct simple_client* client = NULL;
+   double sx = g_server->active_constraint->current.cursor_hint.x;
+   double sy = g_server->active_constraint->current.cursor_hint.y;
+
+   get_client_from_surface(g_server->active_constraint->surface, &client, NULL);
+   if(client && g_server->active_constraint->current.cursor_hint.enabled) {
+      wlr_cursor_warp(g_server->cursor, NULL, sx + client->geom.x, sy + client->geom.y);
+      wlr_seat_pointer_warp(g_server->active_constraint->seat, sx, sy);
+   }
+}
+
+static void
+destroy_pointer_constraint_notify(struct wl_listener *listener, void *data)
+{
+   struct simple_pointer_constraint *pointer_constraint = wl_container_of(listener, pointer_constraint, destroy);
+
+   if(g_server->active_constraint == pointer_constraint->constraint) {
+      cursor_warp_to_hint();
+      g_server->active_constraint = NULL;
+   }
+
+   wl_list_remove(&pointer_constraint->destroy.link);
+   free(pointer_constraint);
+}
+
+static void 
+create_pointer_constraint_notify(struct wl_listener *listener, void *data)
+{
+   struct simple_pointer_constraint *pointer_constraint = calloc(1, sizeof(struct simple_pointer_constraint));
+   pointer_constraint->constraint = data;
+   LISTEN(&pointer_constraint->constraint->events.destroy, &pointer_constraint->destroy, destroy_pointer_constraint_notify);
+}
 
 //--- Input functions ----------------------------------------------------
 void 
@@ -195,6 +248,12 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
 {
    //say(DEBUG, "process_cursor_motion");
 
+   double sx=0, sy=0, sx_confined, sy_confined;
+   struct wlr_surface *surface = NULL;
+   struct simple_layer_surface *lsurface = NULL;
+   struct simple_client *client = NULL, *focused_client = NULL;
+
+   struct wlr_pointer_constraint_v1 *constraint;
    // time is 0 in internal calls meant to restore point focus
    if(time>0){
       wlr_idle_notifier_v1_notify_activity(g_server->idle_notifier, g_server->seat);
@@ -202,12 +261,30 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
       wlr_relative_pointer_manager_v1_send_relative_motion(
             g_server->relative_pointer_manager, g_server->seat, (uint64_t)time*1000,
             dx, dy, dx_unaccel, dy_unaccel);
+
+      wl_list_for_each(constraint, &g_server->pointer_constraints->constraints, link)
+         cursor_constrain(constraint);
+
+      if(g_server->active_constraint && g_server->cursor_mode!=CURSOR_MOVE && g_server->cursor_mode!=CURSOR_RESIZE) {
+         get_client_from_surface(g_server->active_constraint->surface, &client, NULL);
+         if(client && g_server->active_constraint->surface == g_server->seat->pointer_state.focused_surface) {
+            sx = g_server->cursor->x - client->geom.x;
+            sy = g_server->cursor->y - client->geom.y;
+            if(wlr_region_confine(&g_server->active_constraint->region, sx, sy, sx+dx, sy+dy, &sx_confined, &sy_confined)) {
+               dx = sx_confined - sx;
+               dy = sy_confined - sy;
+            }
+
+            if(g_server->active_constraint->type == WLR_POINTER_CONSTRAINT_V1_LOCKED) {
+               //if(!g_server->cursor_hidden) cursor_hide();
+               return;
+            }
+         }
+      }
+      wlr_cursor_move(g_server->cursor, device, dx, dy);
    }
 
    g_server->cur_output = get_output_at(g_server->cursor->x, g_server->cursor->y);
-
-   // update drag icon's position
-   wlr_scene_node_set_position(&g_server->drag_icon->node, g_server->cursor->x, g_server->cursor->y);
 
    if(g_server->cursor_mode == CURSOR_MOVE) {
       process_cursor_move(time);
@@ -217,14 +294,8 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
       return;
    } 
 
-   // Otherwise, find the client under the pointer and send the event along
-   double sx=0, sy=0;
-   struct wlr_seat *wlr_seat = g_server->seat;
-   struct wlr_surface *surface = NULL;
-   struct simple_client *client = NULL, *focused_client = NULL;
-   struct simple_layer_surface *lsurface = NULL;
-   // We actually want the top level
-   int ctype = get_client_at(g_server->cursor->x, g_server->cursor->y, &client, &surface, &sx, &sy);
+   // update drag icon's position
+   wlr_scene_node_set_position(&g_server->drag_icon->node, g_server->cursor->x, g_server->cursor->y);
 
    int ctype_focused = get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, &lsurface);
    if(g_server->cursor_mode==CURSOR_PRESSED && !g_server->seat->drag){ 
@@ -235,16 +306,23 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
       }
    }
 
+   // Otherwise, find the client under the pointer and send the event along
+   //double sx=0, sy=0;
+   //struct wlr_seat *wlr_seat = g_server->seat;
+   // We actually want the top level
+   int ctype = get_client_at(g_server->cursor->x, g_server->cursor->y, &client, &surface, &sx, &sy);
+
+
    if(time>0 && client && ctype!=LAYER_SHELL_CLIENT && ctype_focused!=LAYER_SHELL_CLIENT 
       && client != focused_client && g_config->focus_type>0 && !g_server->seat->drag)
       focus_client(client, g_config->focus_type==RAISE);
 
    if(surface) {
-      wlr_seat_pointer_notify_enter(wlr_seat, surface, sx, sy);
-      wlr_seat_pointer_notify_motion(wlr_seat, time, sx, sy);
+      wlr_seat_pointer_notify_enter(g_server->seat, surface, sx, sy);
+      wlr_seat_pointer_notify_motion(g_server->seat, time, sx, sy);
    } else {
       wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");
-      wlr_seat_pointer_notify_clear_focus(wlr_seat);
+      wlr_seat_pointer_notify_clear_focus(g_server->seat);
    }
 } 
 
@@ -255,7 +333,7 @@ cursor_motion_notify(struct wl_listener *listener, void *data)
    //say(DEBUG, "cursor_motion_notify");
    struct wlr_pointer_motion_event *event = data;
 
-   wlr_cursor_move(g_server->cursor, &event->pointer->base, event->delta_x, event->delta_y);
+   //wlr_cursor_move(g_server->cursor, &event->pointer->base, event->delta_x, event->delta_y);
    process_cursor_motion(event->time_msec, &event->pointer->base, event->delta_x, event->delta_y, 
          event->unaccel_dx, event->unaccel_dy);
 }
@@ -523,6 +601,9 @@ input_init()
    wlr_xcursor_manager_load(g_server->cursor_manager, 1);
 
    g_server->relative_pointer_manager = wlr_relative_pointer_manager_v1_create(g_server->display);
+
+   g_server->pointer_constraints = wlr_pointer_constraints_v1_create(g_server->display);
+   LISTEN(&g_server->pointer_constraints->events.new_constraint, &g_server->new_pointer_constraint, create_pointer_constraint_notify);
 
    g_server->cursor_mode = CURSOR_NORMAL;
    LISTEN(&g_server->cursor->events.motion, &g_server->cursor_motion, cursor_motion_notify);
