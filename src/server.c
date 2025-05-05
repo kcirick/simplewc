@@ -95,10 +95,20 @@ void
 setCurrentTag(int tag, bool toggle)
 {
    struct simple_output* output = g_server->cur_output;
+   struct simple_output* test_output;
+   unsigned int test_tagmask;
+
+   wl_list_for_each(test_output, &g_server->outputs, link) {
+      if(test_output==output) continue;
+      test_tagmask |= test_output->visible_tags;
+   }
+   if(TAGMASK(tag) & test_tagmask) return; // don't do anything if tag is visible on other outputs
+
    if(toggle)
       output->visible_tags ^= TAGMASK(tag);
-   else 
+   else {
       output->visible_tags = output->current_tag = TAGMASK(tag);
+   }
 
    focus_client(get_top_client_from_output(output, false), true);
    //arrange_output(output);
@@ -455,6 +465,15 @@ prepareServer()
    // gamma control manager
    g_server->gamma_control_manager = wlr_gamma_control_manager_v1_create(g_server->display);
    LISTEN(&g_server->gamma_control_manager->events.set_gamma, &g_server->set_gamma, set_gamma_notify);
+
+   // init tags
+   wl_list_init(&g_server->tags);
+   for(int i=0; i<g_config->n_tags; i++){
+      struct simple_tag *tag = calloc(1, sizeof(struct simple_tag));
+      tag->tag_id = TAGMASK(i);
+
+      wl_list_insert(&g_server->tags, &tag->link);
+   }
 
    // create an output layout, i.e. wlroots utility for working with an arrangement of 
    // screens in a physical layout

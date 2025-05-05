@@ -19,6 +19,9 @@ struct simple_server {
    struct wlr_scene_tree *layer_tree[NLayers];
    struct wlr_scene_output_layout *scene_output_layout;
 
+   // tags
+   struct wl_list tags;
+
    // output and decoration manager
    struct wl_list outputs;
    struct simple_output* cur_output;
@@ -113,6 +116,15 @@ struct simple_server {
    double grab_x, grab_y;
    struct wlr_box grab_box;
    uint32_t resize_edges;
+};
+
+struct simple_tag {
+   struct wl_list link;
+
+   unsigned int tag_id;
+
+   struct simple_output *output;
+   struct wl_list *clients;
 };
 
 struct client_outline {

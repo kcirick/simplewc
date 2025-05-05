@@ -30,10 +30,19 @@ arrange_output(struct simple_output* output)
    int n=0;
    bool is_client_visible=false;
    wl_list_for_each(client, &g_server->clients, link) {
-      if(client->output!=output) continue;
       is_client_visible = (client->visible && (client->fixed || (client->tag & output->visible_tags)));
       if(is_client_visible) n++;
       set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
+      
+      if(client->output!=output){  
+         if(client->visible && (client->fixed || (client->tag & client->output->visible_tags)))
+            continue;
+
+         client->geom.x += output->usable_area.x - client->output->usable_area.x; 
+         client->geom.y += output->usable_area.y - client->output->usable_area.y;
+         set_client_geometry(client);
+         client->output = output;
+      }
       wlr_scene_node_set_enabled(&client->scene_tree->node, is_client_visible);
    }
 
@@ -219,6 +228,15 @@ new_output_notify(struct wl_listener *listener, void *data)
    output->wlr_output = wlr_output;
    wlr_output->data = output;
 
+   // set default tag - do this before adding the current output to the global list
+   struct simple_output *test;
+   int test_tag=0;
+   wl_list_for_each(test, &g_server->outputs, link) {
+      if(test->current_tag == TAGMASK(test_tag)) test_tag++; 
+   }
+   output->current_tag = TAGMASK(test_tag);
+   output->visible_tags = TAGMASK(test_tag);
+
    wl_list_init(&output->ipc_outputs);   // ipc addition
 
    output->fullscreen_bg = wlr_scene_rect_create(g_server->layer_tree[LyrFS], 0, 0, (float [4]){0.1, 0.1, 0.1, 1.0});
@@ -254,10 +272,6 @@ new_output_notify(struct wl_listener *listener, void *data)
    //memset(&output->full_area, 0, sizeof(output->full_area));
    //output->full_area = geom;
    
-   //set default tag
-   output->current_tag = TAGMASK(0);
-   output->visible_tags = TAGMASK(0);
-
    wlr_scene_node_set_position(&g_server->root_bg->node, geom.x, geom.y);
    wlr_scene_rect_set_size(g_server->root_bg, geom.width, geom.height);
    wlr_scene_node_set_position(&g_server->locked_bg->node, geom.x, geom.y);

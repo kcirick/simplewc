@@ -115,15 +115,18 @@ ipc_output_printstatus_to(struct simple_ipc_output *ipc_output, bool is_init)
 	zdwl_ipc_output_v2_send_active(ipc_output->resource, output == g_server->cur_output);
 
    ///////////////////////////////////////////
+   struct simple_output *test_output; 
    for (tag = 0 ; tag < g_config->n_tags; tag++) {
       numclients = state = focused_client = 0;
       tagmask = 1 << tag;
-      if ((tagmask & output->visible_tags) != 0)
-         state |= ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE;
+      wl_list_for_each(test_output, &g_server->outputs, link) {
+         if ((tagmask & test_output->visible_tags) != 0)
+            state |= ZDWL_IPC_OUTPUT_V2_TAG_STATE_ACTIVE;
+      }
 
       wl_list_for_each(c, &g_server->clients, link) {
-         if (c->output != output)
-            continue;
+         //if (c->output != output)
+         //   continue;
          if (!(c->tag & tagmask))
             continue;
          if (c == focused)
@@ -133,7 +136,7 @@ ipc_output_printstatus_to(struct simple_ipc_output *ipc_output, bool is_init)
 
          numclients++;
       }
-      if(is_init || output==g_server->cur_output)
+      //if(is_init || output==g_server->cur_output)
          zdwl_ipc_output_v2_send_tag(ipc_output->resource, tag, state, numclients, focused_client);
 	}
 	title = focused ? get_client_title(focused) : "";
@@ -185,8 +188,10 @@ void
 ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint32_t tagmask, uint32_t toggle_tagset)
 {
 	struct simple_ipc_output *ipc_output;
-	struct simple_output *output;
-	unsigned int newtags = tagmask;
+	struct simple_output *output, *test_output;
+	//unsigned int newtags = tagmask;
+	unsigned int newtags = tagmask & ((1 << g_config->n_tags) -1 );
+   unsigned int test_tagmask=0;
 
 	ipc_output = wl_resource_get_user_data(resource);
 	if (!ipc_output) return;
@@ -199,8 +204,21 @@ ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint
 	//if (toggle_tagset)
 	//	monitor->seltags ^= 1;
 
-	output->visible_tags = newtags;
+   say(INFO, "newtags = %d / toggle_tagset = %d", newtags, toggle_tagset);
+
+   wl_list_for_each(test_output, &g_server->outputs, link) {
+      if(test_output==output) continue;
+      test_tagmask |= test_output->visible_tags;
+   }
+   say(INFO, "test_tagmask = %d", test_tagmask);
+
+   if(newtags & test_tagmask) return; // don't do anything if tag is visible on other outputs
+   say(INFO, "PASS");
+
    if(toggle_tagset) output->current_tag = newtags;
+   //  output->visible_tags ^= 1;
+
+	output->visible_tags = newtags;
 	arrange_output(output);
 	print_server_info();
 }
