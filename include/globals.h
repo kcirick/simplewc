@@ -37,6 +37,7 @@ enum LayerType          { LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, LyrFS
 enum NodeDescriptorType { NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP };
 enum Direction          { LEFT, RIGHT, UP, DOWN };
 enum FocusType          { NONE=0, SLOPPY, RAISE };
+enum NewClientPlacement { UNDER_MOUSE=0, CENTERED, HYBRID };
 #ifdef XWAYLAND
 enum NetAtoms  {NetWMWindowTypeDialog, NetWMWindowTypeSplash, NetWMWindowTypeToolbar, NetWMWindowTypeUtility, NetLast };
 #endif
@@ -54,6 +55,8 @@ struct simple_config {
 
    float background_colour[4];
    float border_colour[NBORDERCOL][4];
+
+   int new_client_placement;
 
    char autostart_script[64];
 

@@ -20,7 +20,7 @@ struct simple_server {
    struct wlr_scene_output_layout *scene_output_layout;
 
    // tags
-   struct wl_list tags;
+   //struct wl_list tags;
 
    // output and decoration manager
    struct wl_list outputs;
@@ -63,7 +63,7 @@ struct simple_server {
    struct wl_listener new_input;
 
    struct wlr_cursor *cursor;
-   bool cursor_hidden;
+   //bool cursor_hidden;
    struct wlr_xcursor_manager *cursor_manager;
    struct wlr_relative_pointer_manager_v1 *relative_pointer_manager;
    struct wlr_pointer_constraints_v1 *pointer_constraints;
@@ -116,15 +116,6 @@ struct simple_server {
    double grab_x, grab_y;
    struct wlr_box grab_box;
    uint32_t resize_edges;
-};
-
-struct simple_tag {
-   struct wl_list link;
-
-   unsigned int tag_id;
-
-   struct simple_output *output;
-   struct wl_list *clients;
 };
 
 struct client_outline {

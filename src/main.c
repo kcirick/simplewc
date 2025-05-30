@@ -149,7 +149,7 @@ main(int argc, char **argv)
    startServer();
 
    // Run autostarts and startup comand if defined
-   pid_t start_cmd_pid, autostart_pid;
+   pid_t start_cmd_pid=0, autostart_pid=0;
    if(start_cmd[0]!='\0') start_cmd_pid = spawn(start_cmd);
    if(g_config->autostart_script[0]!='\0') autostart_pid = spawn(g_config->autostart_script);
 

@@ -117,7 +117,7 @@ kb_modifiers_notify(struct wl_listener *listener, void *data)
          wl_list_remove(&client->link);
          wl_list_insert(&g_server->clients, &client->link);
          g_server->grabbed_client=NULL;
-         focus_client(client, true);
+         focus_client(client, true, true);
          arrange_output(g_server->cur_output);
       }
    }
@@ -192,8 +192,8 @@ process_cursor_move(uint32_t time)
    client->geom.x = g_server->cursor->x - g_server->grab_x;
    client->geom.y = g_server->cursor->y - g_server->grab_y;
 
-   client->output = get_output_at(g_server->cursor->x, g_server->cursor->y);
-   client->tag = client->output->current_tag;
+   //client->output = get_output_at(g_server->cursor->x, g_server->cursor->y);
+   //client->tag = client->output->current_tag;
 
    set_client_geometry(client);
 }
@@ -312,10 +312,9 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
    // We actually want the top level
    int ctype = get_client_at(g_server->cursor->x, g_server->cursor->y, &client, &surface, &sx, &sy);
 
-
    if(time>0 && client && ctype!=LAYER_SHELL_CLIENT && ctype_focused!=LAYER_SHELL_CLIENT 
       && client != focused_client && g_config->focus_type>0 && !g_server->seat->drag)
-      focus_client(client, g_config->focus_type==RAISE);
+      focus_client(client, g_config->focus_type==RAISE, true);
 
    if(surface) {
       wlr_seat_pointer_notify_enter(g_server->seat, surface, sx, sy);
@@ -371,9 +370,20 @@ cursor_button_notify(struct wl_listener *listener, void *data)
    switch (event->state) {
       case WLR_BUTTON_RELEASED:
          // button release
-         wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");
+         if(!(g_server->active_constraint && g_server->active_constraint->type==WLR_POINTER_CONSTRAINT_V1_LOCKED))
+            wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");
+
+         if(client && g_server->grabbed_client){
+            struct simple_output *test_output = get_output_at(g_server->cursor->x, g_server->cursor->y);
+            if(test_output->wlr_output->enabled && test_output != client->output){
+               client->output = test_output; 
+               client->tag = client->output->current_tag;
+            }
+         }
+
          g_server->cursor_mode = CURSOR_NORMAL;
          g_server->grabbed_client = NULL;
+
          //wlr_seat_pointer_notify_button(g_server->seat, event->time_msec, event->button, event->state);
          //return;
          break;
@@ -394,7 +404,7 @@ cursor_button_notify(struct wl_listener *listener, void *data)
                }
             }
          } else if(ctype!=LAYER_SHELL_CLIENT) { //press on client
-            focus_client(client, true);
+            focus_client(client, true, true);
             uint32_t resize_edges = get_resize_edges(client, g_server->cursor->x, g_server->cursor->y);
             wl_list_for_each(mousemap, &g_config->mouse_bindings, link) {
                if(modifiers ^ mousemap->mask) continue;
@@ -465,7 +475,7 @@ request_set_primary_selection_notify(struct wl_listener *listener, void *data)
 static void
 destroy_drag_icon_notify(struct wl_listener *listener, void *data)
 {
-   focus_client(get_top_client_from_output(g_server->cur_output, false), true);
+   focus_client(get_top_client_from_output(g_server->cur_output, false), true, true);
 }
 
 static void
@@ -500,6 +510,15 @@ input_destroy_notify(struct wl_listener *listener, void *data)
    if (input->type==INPUT_KEYBOARD) {
       wl_list_remove(&input->kb_modifiers.link);
       wl_list_remove(&input->kb_key.link);
+      
+      ////
+      struct simple_input *test_input=NULL;
+      wl_list_for_each(test_input, &g_server->inputs, link) {
+         if(test_input==input) continue;
+         if(test_input->device->type==WLR_INPUT_DEVICE_KEYBOARD) break;
+      }
+      if(test_input)
+         wlr_seat_set_keyboard(g_server->seat, test_input->keyboard);
    }
    wl_list_remove(&input->destroy.link);
    wl_list_remove(&input->link);

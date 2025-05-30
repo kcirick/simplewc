@@ -7,6 +7,7 @@
 #include <wlr/types/wlr_gamma_control_v1.h>
 #include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_output_power_management_v1.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
 
 #include "globals.h"
 #include "client.h"
@@ -51,11 +52,10 @@ arrange_output(struct simple_output* output)
    else
          wlr_scene_node_set_enabled(&output->fullscreen_bg->node, 0);
 
-   if(n>0){
-      if(!focused_client)
-         focused_client = get_top_client_from_output(output, false);
-      focus_client(focused_client, true);
-   } else
+   focused_client = get_top_client_from_output(output, false);
+   if(focused_client)
+      focus_client(focused_client, true, false);
+   else
       input_focus_surface(NULL);
 
    check_idle_inhibitor();
@@ -68,10 +68,11 @@ get_output_at(double x, double y)
    wlr_output_layout_closest_point(g_server->output_layout, NULL, x, y, 
          &closest_x, &closest_y);
    struct wlr_output *output = wlr_output_layout_output_at(g_server->output_layout, closest_x, closest_y);
+   if(!output) return NULL;
 
    struct simple_output* test_output;
    wl_list_for_each(test_output, &g_server->outputs, link) {
-      if(output->data == test_output) return test_output;
+      if(test_output && output->data == test_output) return test_output;
    }
    return NULL;
 }
@@ -80,7 +81,7 @@ get_output_at(double x, double y)
 static void 
 output_frame_notify(struct wl_listener *listener, void *data) 
 {
-   //say(DEBUG, "output_frame_notify");
+   say(DEBUG, "output_frame_notify");
    struct simple_output *output = wl_container_of(listener, output, frame);
    struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(g_server->scene, output->wlr_output);
    
@@ -130,23 +131,48 @@ output_destroy_notify(struct wl_listener *listener, void *data)
    wl_list_for_each_safe(ipc_output, ipc_output_tmp, &output->ipc_outputs, link)
       wl_resource_destroy(ipc_output->resource);
 
+   struct simple_layer_surface *l, *tmp;
+   size_t i;
+
+   for(i=0; i<LENGTH(output->layer_shells); i++){
+      wl_list_for_each_safe(l, tmp, &output->layer_shells[i], link)
+         wlr_layer_surface_v1_destroy(l->scene_layer_surface->layer_surface);
+   }
+
    wl_list_remove(&output->frame.link);
    wl_list_remove(&output->request_state.link);
    wl_list_remove(&output->destroy.link);
    wl_list_remove(&output->link);
+   output->wlr_output->data = NULL;
+   wlr_output_layout_remove(g_server->output_layout, output->wlr_output);
+   //wlr_scene_output_destroy(output->scene_output);
+
+   struct simple_output *test_output;
+   wl_list_for_each(test_output, &g_server->outputs, link) {
+      if(test_output == output) continue;
+      if(test_output->wlr_output->enabled) g_server->cur_output = test_output;
+   }
 
    // Move clients to the previous output
    struct simple_client * client;
    wl_list_for_each(client, &g_server->clients, link) {
-      if(client->geom.x > output->usable_area.width){
+      if(client->output != output) continue;
+
+      if(client->geom.x > output->usable_area.x){
          client->geom.x = client->geom.x - output->usable_area.width;
          set_client_geometry(client);
       }
       struct simple_output *new_op = get_output_at(client->geom.x, client->geom.y);
-      if(new_op) client->output = new_op;
+      if(new_op->wlr_output->enabled && new_op==g_server->cur_output) 
+         client->output = new_op;
+   
+      //client->output = g_server->cur_output;
    }
+
    wlr_scene_node_destroy(&output->fullscreen_bg->node);
    free(output);
+
+   print_server_info();
 }
 
 //------------------------------------------------------------------------
@@ -281,6 +307,8 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_scene_rect_set_size(output->fullscreen_bg, output->usable_area.width, output->usable_area.height);
 
    wlr_scene_node_set_enabled(&g_server->root_bg->node, 1);
+
+   print_server_info();
 
    say(INFO, " -> Output %s : %dx%d+%d+%d", l_output->output->name,
          output->usable_area.width, output->usable_area.height, 

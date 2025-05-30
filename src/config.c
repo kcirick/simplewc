@@ -55,6 +55,7 @@ set_defaults()
    g_config->border_width = 2;
    g_config->focus_type = 0;
    g_config->moveresize_step = 10;
+   g_config->new_client_placement = HYBRID;
 
    colour2rgba("#111111", g_config->background_colour);
    colour2rgba("#0000FF", g_config->border_colour[FOCUSED]);
@@ -111,6 +112,7 @@ readConfiguration(char* filename)
       if(!strcmp(id, "moveresize_step"))  g_config->moveresize_step = atoi(value);
       if(!strcmp(id, "focus_type"))       g_config->focus_type = atoi(value);
       if(!strcmp(id, "touchpad_tap_click"))  g_config->touchpad_tap_click = !strcmp(value, "true") ? true : false; 
+      if(!strcmp(id, "new_client_placement")) g_config->new_client_placement = atoi(value);
 
       if(!strcmp(id, "background_colour"))      colour2rgba(value, g_config->background_colour);
       if(!strcmp(id, "border_colour_focus"))    colour2rgba(value, g_config->border_colour[FOCUSED]);
@@ -193,7 +195,7 @@ readConfiguration(char* filename)
          trim(args);
 
          unsigned int mod = 0;
-         unsigned int button;
+         unsigned int button = 0;
          char button_char[32];
          token = strtok(binding, "+");
          strncpy(button_char, token, sizeof button_char);

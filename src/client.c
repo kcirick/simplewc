@@ -41,7 +41,7 @@ toggleClientVisible(struct simple_client *client)
    
    client->visible ^= 1;
 
-   focus_client(get_top_client_from_output(client->output, false), true);
+   focus_client(get_top_client_from_output(client->output, false), true, true);
 }
 
 void
@@ -196,8 +196,7 @@ cycleClients(struct simple_output *output){
    // draw the border
    struct client_outline* outline = g_server->grabbed_client_outline;
    if(!outline){
-      int line_width = 4;
-      outline = client_outline_create(&g_server->scene->tree, g_config->border_colour[OUTLINE], line_width);
+      outline = client_outline_create(&g_server->scene->tree, g_config->border_colour[OUTLINE], g_config->border_width*2);
       wlr_scene_node_place_above(&outline->tree->node, &g_server->layer_tree[LyrClient]->node);
       g_server->grabbed_client_outline = outline;
    }
@@ -454,14 +453,12 @@ set_client_border_colour(struct simple_client *client, int colour)
 }
 
 void 
-focus_client(struct simple_client *client, bool raise) 
+focus_client(struct simple_client *client, bool raise, bool check_previous) 
 {
    say(DEBUG, "focus_client()");
    if(!client) return;
 
    struct wlr_surface *surface = get_client_surface(client); 
-   int old_client_type;
-   struct simple_client* old_client=NULL;
 
    if(raise){
       wlr_scene_node_raise_to_top(&client->scene_tree->node);
@@ -476,12 +473,15 @@ focus_client(struct simple_client *client, bool raise)
       }
    }
 
-   struct wlr_surface *prev_surface = g_server->seat->keyboard_state.focused_surface;
-   if(prev_surface==surface) return;
+   if(check_previous) {
+      int old_client_type;
+      struct simple_client* old_client=NULL;
 
-   if(prev_surface){
+      struct wlr_surface *prev_surface = g_server->seat->keyboard_state.focused_surface;
+      if(!prev_surface || prev_surface==surface) return;
+
       old_client_type = get_client_from_surface(prev_surface, &old_client, NULL);
-      if(client->type!= XWL_UNMANAGED_CLIENT && (old_client_type == XDG_SHELL_CLIENT || old_client_type == XWL_MANAGED_CLIENT)){
+      if(old_client && client->type!= XWL_UNMANAGED_CLIENT && (old_client_type == XDG_SHELL_CLIENT || old_client_type == XWL_MANAGED_CLIENT)){
          //deactivate the previously focused surface.
          set_client_activated(old_client, false);
          set_client_border_colour(old_client, UNFOCUSED);
@@ -491,7 +491,7 @@ focus_client(struct simple_client *client, bool raise)
    // update the output
    client->output = get_output_at(g_server->cursor->x, g_server->cursor->y);
    g_server->cur_output = client->output;
-   
+
    client->visible = true;
    client->urgent = false;
    set_client_activated(client, true);
@@ -512,12 +512,46 @@ set_initial_geometry(struct simple_client* client)
       get_client_geometry(client, &client->geom);
 
    // Set initial coord based on cursor position
-   client->geom.x = g_server->cursor->x;
-   client->geom.y = g_server->cursor->y;
+   //client->geom.x = g_server->cursor->x;
+   //client->geom.y = g_server->cursor->y;
 
    struct simple_output* output = g_server->cur_output;
    struct wlr_box bounds = output->usable_area;
 
+   struct simple_client* top_client = get_top_client_from_output(output, false);
+   switch(g_config->new_client_placement){
+      case UNDER_MOUSE:
+         // Set initial coord based on cursor position
+         client->geom.x = g_server->cursor->x;
+         client->geom.y = g_server->cursor->y;
+         break;
+      case CENTERED:
+         // center on output
+         client->geom.x = (bounds.width-client->geom.width)/2 + bounds.x;
+         client->geom.y = (bounds.height-client->geom.height)/2 + bounds.y;
+         break;
+      case HYBRID:
+      default:
+         if(top_client){
+            if(g_server->cursor->x > top_client->geom.x && g_server->cursor->x < top_client->geom.x+top_client->geom.width &&
+                  g_server->cursor->y > top_client->geom.y && g_server->cursor->y < top_client->geom.y+top_client->geom.height ){ 
+               // stagger
+               client->geom.x = top_client->geom.x + 25;
+               client->geom.y = top_client->geom.y + 25;
+            } else {
+               // Set initial coord based on cursor position
+               client->geom.x = g_server->cursor->x;
+               client->geom.y = g_server->cursor->y;
+            }
+         } else {
+            // center on output
+            client->geom.x = (bounds.width-client->geom.width)/2 + bounds.x;
+            client->geom.y = (bounds.height-client->geom.height)/2 + bounds.y;
+         }
+         break;
+   }
+
+   
    // check the boundaries
    if(client->geom.x<bounds.x+g_config->border_width) client->geom.x=bounds.x + g_config->border_width;
    if(client->geom.y<bounds.y+g_config->border_width) client->geom.y=bounds.y + g_config->border_width;
@@ -579,7 +613,7 @@ map_notify(struct wl_listener *listener, void *data)
       wlr_scene_node_reparent(&client->scene_tree->node, g_server->layer_tree[LyrOverlay]);
       wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
       if(wlr_xwayland_or_surface_wants_focus(client->xwl_surface))
-         focus_client(client, true);
+         focus_client(client, true, true);
       return;
    }
 
@@ -597,12 +631,14 @@ map_notify(struct wl_listener *listener, void *data)
    }
 #endif
    
-   wl_list_insert(&g_server->clients, &client->link);
+   // set initial geomtry before adding to the global client list
    set_initial_geometry(client);
+
+   wl_list_insert(&g_server->clients, &client->link);
 
    wlr_scene_node_reparent(&client->scene_tree->node, g_server->layer_tree[LyrClient]);
 
-   focus_client(client, true);
+   focus_client(client, true, true);
 }
 
 static void 
@@ -623,7 +659,7 @@ unmap_notify(struct wl_listener *listener, void *data)
 #if XWAYLAND
    if(client->type==XWL_UNMANAGED_CLIENT){
       if(client->xwl_surface->surface == g_server->seat->keyboard_state.focused_surface)
-         focus_client(get_top_client_from_output(g_server->cur_output, false), true);
+         focus_client(get_top_client_from_output(g_server->cur_output, false), true, false);
    } else
 #endif
       wl_list_remove(&client->link);
@@ -655,7 +691,6 @@ destroy_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "client_destroy_notify");
    struct simple_client *client = wl_container_of(listener, client, destroy);
-//   struct simple_output * output = g_server->cur_output;
 
    if(client->fullscreen)
       wlr_scene_node_set_enabled(&client->output->fullscreen_bg->node, 0);
@@ -675,7 +710,9 @@ destroy_notify(struct wl_listener *listener, void *data)
    }
    free(client);
 
-   //focus_client(get_top_client_from_output(output, false), true);
+   focus_client(get_top_client_from_output(g_server->cur_output, false), true, false);
+
+   print_server_info();
 }
 
 static void

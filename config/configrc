@@ -29,6 +29,10 @@ focus_type = 1
 #xkb_layout = us
 #xkb_options = compose:ralt
 
+#--- Placement of new client -----
+# 0 - under mouse / 1 - cenetered on output / 2 - hybrid
+#new_client_placement = 2
+
 #--- Touchpad settings -----
 touchpad_tap_click = false
 

@@ -5,6 +5,10 @@ project (
   version: '0.4',
   license: 'MIT',
   meson_version: '>=0.59.0',
+  default_options: [
+    #'c_std=c11',
+    'b_ndebug=if-release'
+  ]
 )
 
 add_project_arguments(
@@ -84,7 +88,7 @@ dependencies_client += [ dwl_proto, wl_client_proto ]
 #--- executables
 executable (
   'simplewc',
-  [ 'main.c',
+  [ 'src/main.c',
     'src/action.c',
     'src/client.c',
     'src/config.c',

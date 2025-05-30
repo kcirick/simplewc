@@ -139,7 +139,7 @@ layer_surface_destroy_notify(struct wl_listener *listener, void *data)
    //wlr_scene_node_destroy(&lsurface->scene_tree->node);
    free(lsurface);
 
-   focus_client(get_top_client_from_output(output, false), true);
+   focus_client(get_top_client_from_output(output, false), true, false);
 }
 
 //------------------------------------------------------------------------

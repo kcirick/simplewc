@@ -96,7 +96,7 @@ setCurrentTag(int tag, bool toggle)
 {
    struct simple_output* output = g_server->cur_output;
    struct simple_output* test_output;
-   unsigned int test_tagmask;
+   unsigned int test_tagmask=0;
 
    wl_list_for_each(test_output, &g_server->outputs, link) {
       if(test_output==output) continue;
@@ -106,12 +106,9 @@ setCurrentTag(int tag, bool toggle)
 
    if(toggle)
       output->visible_tags ^= TAGMASK(tag);
-   else {
+   else 
       output->visible_tags = output->current_tag = TAGMASK(tag);
-   }
 
-   focus_client(get_top_client_from_output(output, false), true);
-   //arrange_output(output);
    print_server_info();
 }
 
@@ -168,8 +165,7 @@ print_server_info()
 
    wl_list_for_each(output, &g_server->outputs, link) {
       ipc_output_printstatus(output);
-      say(DEBUG, "output %s", output->wlr_output->name);
-      say(DEBUG, " -> cur_output = %u", output == g_server->cur_output);
+      say(DEBUG, "output %s (%s)", output->wlr_output->name, output == g_server->cur_output?"*":"");
       say(DEBUG, " -> tag = vis:%u / cur:%u", output->visible_tags, output->current_tag);
       wl_list_for_each(client, &g_server->clients, link) {
          struct simple_client* focused_client=NULL;
@@ -302,7 +298,7 @@ lock_surface_destroy_notify(struct wl_listener *listener, void *data)
       struct wlr_session_lock_surface_v1 *surface = wl_container_of(g_server->cur_lock->surfaces.next, surface, link);
       input_focus_surface(surface->surface);
    } else if(!(g_server->locked)){
-      focus_client(get_top_client_from_output(output, false), true);
+      focus_client(get_top_client_from_output(output, false), true, true);
    } else {
       wlr_seat_keyboard_clear_focus(g_server->seat);
    }
@@ -466,22 +462,13 @@ prepareServer()
    g_server->gamma_control_manager = wlr_gamma_control_manager_v1_create(g_server->display);
    LISTEN(&g_server->gamma_control_manager->events.set_gamma, &g_server->set_gamma, set_gamma_notify);
 
-   // init tags
-   wl_list_init(&g_server->tags);
-   for(int i=0; i<g_config->n_tags; i++){
-      struct simple_tag *tag = calloc(1, sizeof(struct simple_tag));
-      tag->tag_id = TAGMASK(i);
-
-      wl_list_insert(&g_server->tags, &tag->link);
-   }
-
    // create an output layout, i.e. wlroots utility for working with an arrangement of 
    // screens in a physical layout
    g_server->output_layout = wlr_output_layout_create(g_server->display);
    LISTEN(&g_server->output_layout->events.change, &g_server->output_layout_change, output_layout_change_notify);
    wlr_xdg_output_manager_v1_create(g_server->display, g_server->output_layout);
 
-   wl_list_init(&g_server->outputs);   
+   wl_list_init(&g_server->outputs);
    LISTEN(&g_server->backend->events.new_output, &g_server->new_output, new_output_notify);
 
    g_server->scene_output_layout = wlr_scene_attach_output_layout(g_server->scene, g_server->output_layout);

@@ -196,27 +196,20 @@ ipc_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint
 	ipc_output = wl_resource_get_user_data(resource);
 	if (!ipc_output) return;
 
-	output = ipc_output->output;
+	if(!(output = ipc_output->output)) return;
    g_server->cur_output = output;
 
-	if (!newtags || newtags == output->visible_tags)
-		return;
-	//if (toggle_tagset)
-	//	monitor->seltags ^= 1;
+	if (!newtags || newtags == output->visible_tags) return;
 
-   say(INFO, "newtags = %d / toggle_tagset = %d", newtags, toggle_tagset);
+   if(toggle_tagset) {
+      wl_list_for_each(test_output, &g_server->outputs, link) {
+         if(test_output==output) continue;
+         test_tagmask |= test_output->visible_tags;
+      }
+      if(newtags & test_tagmask) return; // don't do anything if tag is visible on other outputs
 
-   wl_list_for_each(test_output, &g_server->outputs, link) {
-      if(test_output==output) continue;
-      test_tagmask |= test_output->visible_tags;
+      output->current_tag = newtags;
    }
-   say(INFO, "test_tagmask = %d", test_tagmask);
-
-   if(newtags & test_tagmask) return; // don't do anything if tag is visible on other outputs
-   say(INFO, "PASS");
-
-   if(toggle_tagset) output->current_tag = newtags;
-   //  output->visible_tags ^= 1;
 
 	output->visible_tags = newtags;
 	arrange_output(output);
