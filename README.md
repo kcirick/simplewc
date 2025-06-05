@@ -13,7 +13,7 @@ to teach myself the basics of window management.
    - No frills (menu, titlebar, icons, pixmap themes, etc...)
    - Text config file (default $HOME/.config/simplewc/configrc)
    - Simple tiling (manual left-right tiling or one-shot auto-tile like DWL/DWM)
-   - simplewc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])
+   - ~~simplewc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])~~
 
 [tinywl]: https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl
 [dwl]: https://codeberg.org/dwl/dwl
@@ -30,11 +30,8 @@ v0.1
 
 ### Usage
 
-    > simplewc [--config file][--start cmd][--debug|--info][--version][--help]
+    > simplewc [--config file][--start cmd][--exit][--debug|--info][--version][--help]
 
-    > simplewc-msg --set [tag .+-^][client tag_n]
-                  (--get|--watch) (tagcount|output|tag|client)
-                   --action (quit|reconfig)
 
 ### Build
 
@@ -68,6 +65,7 @@ Please use [Github Issues Tracker][ghit] to report bugs and issues.
   - 0.4 (Work in progress)
     - Goal: Continue to improve the compositor, optimize for efficiency.
     - Uses wlroots v0.18
+    - Remove simplewc-msg
   - 0.3 (2025-04-12) ([download][v03])
     - Goal: Better support for multihead and fullscreen
     - Uses wlroots v0.18
