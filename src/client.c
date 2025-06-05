@@ -40,8 +40,7 @@ toggleClientVisible(struct simple_client *client)
    if(!client) return;
    
    client->visible ^= 1;
-
-   focus_client(get_top_client_from_output(client->output, false), true, true);
+   focus_client(get_top_client_from_output(client->output, false), true);
 }
 
 void
@@ -55,7 +54,8 @@ toggleClientFixed(struct simple_client *client)
    client->fixed ^= 1;
 }
 
-void setClientFullscreen(struct simple_client *client, int fullscreen)
+void 
+setClientFullscreen(struct simple_client *client, int fullscreen)
 {
    say(DEBUG, "setClientFullscreen");
    if(!client) return;
@@ -92,7 +92,6 @@ toggleClientFullscreen(struct simple_client *client)
    if(!client) return;
 
    client->fullscreen ^= 1;
-
    setClientFullscreen(client, client->fullscreen);
 }
 
@@ -126,7 +125,6 @@ toggleClientMaximize(struct simple_client *client)
    if(!client) return;
 
    client->maximized ^= 1;
-
    maximizeClient(client, client->maximized);
 }
 
@@ -453,7 +451,7 @@ set_client_border_colour(struct simple_client *client, int colour)
 }
 
 void 
-focus_client(struct simple_client *client, bool raise, bool check_previous) 
+focus_client(struct simple_client *client, bool raise) 
 {
    say(DEBUG, "focus_client()");
    if(!client) return;
@@ -473,15 +471,14 @@ focus_client(struct simple_client *client, bool raise, bool check_previous)
       }
    }
 
-   if(check_previous) {
-      int old_client_type;
-      struct simple_client* old_client=NULL;
-
-      struct wlr_surface *prev_surface = g_server->seat->keyboard_state.focused_surface;
-      if(!prev_surface || prev_surface==surface) return;
-
+   //check for previously focused client
+   int old_client_type;
+   struct simple_client* old_client=NULL;
+   struct wlr_surface *prev_surface = g_server->seat->keyboard_state.focused_surface;
+   if(prev_surface && prev_surface!=surface){
       old_client_type = get_client_from_surface(prev_surface, &old_client, NULL);
-      if(old_client && client->type!= XWL_UNMANAGED_CLIENT && (old_client_type == XDG_SHELL_CLIENT || old_client_type == XWL_MANAGED_CLIENT)){
+      if(old_client && !old_client->destroy_requested && client->type!= XWL_UNMANAGED_CLIENT && 
+            (old_client_type == XDG_SHELL_CLIENT || old_client_type == XWL_MANAGED_CLIENT)){
          //deactivate the previously focused surface.
          set_client_activated(old_client, false);
          set_client_border_colour(old_client, UNFOCUSED);
@@ -605,6 +602,7 @@ map_notify(struct wl_listener *listener, void *data)
    client->fixed = false;
    client->urgent = false;
    client->fullscreen = false;
+   client->destroy_requested = false;
 
 #if XWAYLAND
    // Handle unmanaged clients first
@@ -613,7 +611,7 @@ map_notify(struct wl_listener *listener, void *data)
       wlr_scene_node_reparent(&client->scene_tree->node, g_server->layer_tree[LyrOverlay]);
       wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
       if(wlr_xwayland_or_surface_wants_focus(client->xwl_surface))
-         focus_client(client, true, true);
+         focus_client(client, true);
       return;
    }
 
@@ -638,7 +636,7 @@ map_notify(struct wl_listener *listener, void *data)
 
    wlr_scene_node_reparent(&client->scene_tree->node, g_server->layer_tree[LyrClient]);
 
-   focus_client(client, true, true);
+   focus_client(client, true);
 }
 
 static void 
@@ -659,7 +657,7 @@ unmap_notify(struct wl_listener *listener, void *data)
 #if XWAYLAND
    if(client->type==XWL_UNMANAGED_CLIENT){
       if(client->xwl_surface->surface == g_server->seat->keyboard_state.focused_surface)
-         focus_client(get_top_client_from_output(g_server->cur_output, false), true, false);
+         focus_client(get_top_client_from_output(g_server->cur_output, false), true);
    } else
 #endif
       wl_list_remove(&client->link);
@@ -695,6 +693,9 @@ destroy_notify(struct wl_listener *listener, void *data)
    if(client->fullscreen)
       wlr_scene_node_set_enabled(&client->output->fullscreen_bg->node, 0);
 
+   // Remove reference to the client in the scene_tree
+   client->destroy_requested = true;
+
    wl_list_remove(&client->destroy.link);
    wl_list_remove(&client->request_fullscreen.link);
    if(client->type==XDG_SHELL_CLIENT){
@@ -710,7 +711,8 @@ destroy_notify(struct wl_listener *listener, void *data)
    }
    free(client);
 
-   focus_client(get_top_client_from_output(g_server->cur_output, false), true, false);
+   arrange_output(g_server->cur_output);
+   //focus_client(get_top_client_from_output(g_server->cur_output, false), true);
 
    print_server_info();
 }

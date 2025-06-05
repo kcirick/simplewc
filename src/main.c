@@ -75,6 +75,19 @@ signal_handler(int sig)
       wl_display_terminate(g_server->display);
 }
 
+void
+exit_simplewc() 
+{
+   char* pid_c = getenv("SIMPLEWC_PID");
+   if(!pid_c)
+      say(ERROR, "SIMPLEWC_PID not set");
+   
+   int pid_i = atoi(pid_c);
+   if(!pid_i)
+      say(ERROR, "pid should not be zero");
+   kill(pid_i, SIGTERM);
+}
+
 //--- Main function ------------------------------------------------------
 int
 main(int argc, char **argv)
@@ -87,6 +100,7 @@ main(int argc, char **argv)
    static struct option long_options[] = {
       { "config",    required_argument,   0, 'c' },
       { "start",     required_argument,   0, 's' },
+      { "exit",      no_argument,         0, 'e' },
       { "info",      no_argument,         0, 'i' },
       { "debug",     no_argument,         0, 'd' },
       { "version",   no_argument,         0, 'v' },
@@ -101,6 +115,9 @@ main(int argc, char **argv)
          case 's' :
             sprintf(start_cmd, optarg);
             break;
+         case 'e' :
+            exit_simplewc();
+            exit(EXIT_SUCCESS);
          case 'd' :
             info_level = WLR_DEBUG;
             break;
@@ -111,7 +128,7 @@ main(int argc, char **argv)
             printf("simplewc v"VERSION"\n");
             exit(EXIT_SUCCESS);
          default:
-            printf("Usage: simplewc [--config file][--start cmd][--debug|--info][--version][--help]\n");
+            printf("Usage: simplewc [--config file][--start cmd][--exit][--debug|--info][--version][--help]\n");
             exit(EXIT_SUCCESS);
         }
     }
@@ -132,6 +149,14 @@ main(int argc, char **argv)
 
    for(int i=0; i<LENGTH(signals); i++)
       sigaction(signals[i], &sa, NULL);
+
+   // set SIMPLEWC_PID environment variable
+   char pid[32];
+   snprintf(pid, sizeof(pid), "%d", getpid());
+   if(setenv("SIMPLEWC_PID", pid, true)<0)
+      say(ERROR, "unable to set SIMPLEWC_PID");
+   else
+      say(INFO, "SIMPLEWC_PID=%s", pid);
 
    // Start WLR logging
    wlr_log_init(info_level, NULL);

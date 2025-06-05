@@ -49,6 +49,7 @@ struct simple_client {
    struct wlr_box prev_geom;
 
    bool resize_requested;
+   bool destroy_requested;
 };
    
 //--- action calls
@@ -68,7 +69,7 @@ char * get_client_appid(struct simple_client*);
 struct simple_client* get_top_client_from_output(struct simple_output*, bool);
 int get_client_at(double, double, struct simple_client**, struct wlr_surface**, double*, double*);
 int get_client_from_surface(struct wlr_surface*, struct simple_client**, struct simple_layer_surface**);
-void focus_client(struct simple_client*, bool, bool);
+void focus_client(struct simple_client*, bool);
 void begin_interactive(struct simple_client*, enum CursorMode, uint32_t);
 
 void get_client_geometry(struct simple_client*, struct wlr_box*);

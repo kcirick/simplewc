@@ -60,11 +60,11 @@ wlscanner_server_header = generator(
   output: '@BASENAME@-protocol.h',
   arguments: ['server-header', '@INPUT@', '@OUTPUT@']
 )
-wlscanner_client_header = generator(
-  wlscanner,
-  output: '@BASENAME@-protocol.h',
-  arguments: ['client-header', '@INPUT@', '@OUTPUT@']
-)
+#wlscanner_client_header = generator(
+#  wlscanner,
+#  output: '@BASENAME@-protocol.h',
+#  arguments: ['client-header', '@INPUT@', '@OUTPUT@']
+#)
 
 dwl_proto_files = []
 dwl_proto_files += wlscanner_code.process('protocols' / 'dwl-ipc-unstable-v2.xml')
@@ -78,12 +78,12 @@ wl_server_proto_files += wlscanner_server_header.process('protocols' / 'wlr-laye
 wl_server_proto_files += wlscanner_server_header.process('protocols' / 'dwl-ipc-unstable-v2.xml')
 wl_server_proto = declare_dependency( sources: wl_server_proto_files )
 
-wl_client_proto_files = []
-wl_client_proto_files += wlscanner_client_header.process('protocols' / 'dwl-ipc-unstable-v2.xml')
-wl_client_proto = declare_dependency( sources: wl_client_proto_files )
+#wl_client_proto_files = []
+#wl_client_proto_files += wlscanner_client_header.process('protocols' / 'dwl-ipc-unstable-v2.xml')
+#wl_client_proto = declare_dependency( sources: wl_client_proto_files )
 
 dependencies_server += [ dwl_proto, wl_server_proto ]
-dependencies_client += [ dwl_proto, wl_client_proto ]
+#dependencies_client += [ dwl_proto, wl_client_proto ]
 
 #--- executables
 executable (
@@ -100,13 +100,6 @@ executable (
     ],
   dependencies: dependencies_server,
   include_directories: ['include'],
-  install: true
-)
-
-executable (
-  'simplewc-msg',
-  [ 'util/simplewc-msg.c' ],
-  dependencies: dependencies_client,
   install: true
 )
 

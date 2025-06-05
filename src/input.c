@@ -117,7 +117,8 @@ kb_modifiers_notify(struct wl_listener *listener, void *data)
          wl_list_remove(&client->link);
          wl_list_insert(&g_server->clients, &client->link);
          g_server->grabbed_client=NULL;
-         focus_client(client, true, true);
+
+         //focus_client(client, true, true);
          arrange_output(g_server->cur_output);
       }
    }
@@ -314,7 +315,7 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
 
    if(time>0 && client && ctype!=LAYER_SHELL_CLIENT && ctype_focused!=LAYER_SHELL_CLIENT 
       && client != focused_client && g_config->focus_type>0 && !g_server->seat->drag)
-      focus_client(client, g_config->focus_type==RAISE, true);
+      focus_client(client, g_config->focus_type==RAISE);
 
    if(surface) {
       wlr_seat_pointer_notify_enter(g_server->seat, surface, sx, sy);
@@ -404,7 +405,7 @@ cursor_button_notify(struct wl_listener *listener, void *data)
                }
             }
          } else if(ctype!=LAYER_SHELL_CLIENT) { //press on client
-            focus_client(client, true, true);
+            focus_client(client, true);
             uint32_t resize_edges = get_resize_edges(client, g_server->cursor->x, g_server->cursor->y);
             wl_list_for_each(mousemap, &g_config->mouse_bindings, link) {
                if(modifiers ^ mousemap->mask) continue;
@@ -475,7 +476,7 @@ request_set_primary_selection_notify(struct wl_listener *listener, void *data)
 static void
 destroy_drag_icon_notify(struct wl_listener *listener, void *data)
 {
-   focus_client(get_top_client_from_output(g_server->cur_output, false), true, true);
+   focus_client(get_top_client_from_output(g_server->cur_output, false), true);
 }
 
 static void

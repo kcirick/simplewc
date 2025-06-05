@@ -298,7 +298,7 @@ lock_surface_destroy_notify(struct wl_listener *listener, void *data)
       struct wlr_session_lock_surface_v1 *surface = wl_container_of(g_server->cur_lock->surfaces.next, surface, link);
       input_focus_surface(surface->surface);
    } else if(!(g_server->locked)){
-      focus_client(get_top_client_from_output(output, false), true, true);
+      focus_client(get_top_client_from_output(output, false), true);
    } else {
       wlr_seat_keyboard_clear_focus(g_server->seat);
    }

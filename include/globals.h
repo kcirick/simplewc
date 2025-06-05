@@ -92,7 +92,7 @@ extern struct simple_config* g_config;
 
 //--- functions in config.c -----
 void readConfiguration(char*);
-void reloadConfiguration();
+//void reloadConfiguration();
 
 //--- functions in main.c -----
 void say(int, const char*, ...);

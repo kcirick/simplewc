@@ -31,6 +31,7 @@ arrange_output(struct simple_output* output)
    int n=0;
    bool is_client_visible=false;
    wl_list_for_each(client, &g_server->clients, link) {
+      if(client->destroy_requested) continue;
       is_client_visible = (client->visible && (client->fixed || (client->tag & output->visible_tags)));
       if(is_client_visible) n++;
       set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
@@ -54,7 +55,7 @@ arrange_output(struct simple_output* output)
 
    focused_client = get_top_client_from_output(output, false);
    if(focused_client)
-      focus_client(focused_client, true, false);
+      focus_client(focused_client, true);
    else
       input_focus_surface(NULL);
 

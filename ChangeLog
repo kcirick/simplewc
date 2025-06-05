@@ -4,6 +4,12 @@ TODO
 	* : Tags should be renamed to virtual workspace (vws)
 
 v0.3 -> v0.4 Changes
+2025-06-01
+	* meson.build: Remove simplewc-msg executable
+	* src/main.c: add --exit option to exit current simplewc instance
+	* src/client.c: Fix segfault upon destroy_notify()
+	* src/config.c: Remove no longer used reloadConfiguration()
+
 2025-05-30
 	* src/main.c: Move main.c to proper location
 	* src/input.c: Fix segfault on keyboard unplug

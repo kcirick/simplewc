@@ -232,7 +232,7 @@ readConfiguration(char* filename)
    }
    fclose(f);
 }
-
+/*
 void
 reloadConfiguration() {
    if(g_config->config_file_name[0]=='\0')
@@ -240,3 +240,4 @@ reloadConfiguration() {
 
    readConfiguration(g_config->config_file_name);
 }
+*/
