@@ -40,22 +40,21 @@ say(int level, const char* message, ...)
    if(level==ERROR) exit(EXIT_FAILURE);
 }
 
-pid_t
+void
 spawn(char* cmd)
 {
+   say(DEBUG, "Spawn %s", cmd);
+
    char *sh = NULL;
    if(!(sh=getenv("SHELL"))) sh = (char*)"/bin/sh";
 
-   say(DEBUG, "Spawn %s", cmd);
    // from dwl:
    pid_t pid = fork();
    if(pid==0) {
       dup2(STDERR_FILENO, STDOUT_FILENO);
       setsid();
-      execl(sh, sh, "-c", cmd, (char*) NULL);
-      say(DEBUG, "execl %s failed", cmd);
+      execl(sh, sh, "-c", cmd, (char*)NULL);
    }
-   return pid;
 }
 
 void
@@ -71,7 +70,7 @@ signal_handler(int sig)
 #else
       while (0 < waitpid(-1, NULL, WNOHANG));
 #endif
-   } else if (sig == SIGINT || sig == SIGTERM )
+   } else if (sig == SIGINT || sig == SIGTERM)
       wl_display_terminate(g_server->display);
 }
 
@@ -79,12 +78,11 @@ void
 exit_simplewc() 
 {
    char* pid_c = getenv("SIMPLEWC_PID");
-   if(!pid_c)
-      say(ERROR, "SIMPLEWC_PID not set");
+   if(!pid_c) say(ERROR, "SIMPLEWC_PID not set");
    
    int pid_i = atoi(pid_c);
-   if(!pid_i)
-      say(ERROR, "pid should not be zero");
+   if(!pid_i) say(ERROR, "pid should not be zero");
+   
    kill(pid_i, SIGTERM);
 }
 
@@ -150,6 +148,9 @@ main(int argc, char **argv)
    for(int i=0; i<LENGTH(signals); i++)
       sigaction(signals[i], &sa, NULL);
 
+   // Start WLR logging
+   wlr_log_init(info_level, NULL);
+
    // set SIMPLEWC_PID environment variable
    char pid[32];
    snprintf(pid, sizeof(pid), "%d", getpid());
@@ -157,9 +158,6 @@ main(int argc, char **argv)
       say(ERROR, "unable to set SIMPLEWC_PID");
    else
       say(INFO, "SIMPLEWC_PID=%s", pid);
-
-   // Start WLR logging
-   wlr_log_init(info_level, NULL);
 
    // Read in config
    if(!(g_config = calloc(1, sizeof(struct simple_config))))
@@ -174,24 +172,13 @@ main(int argc, char **argv)
    startServer();
 
    // Run autostarts and startup comand if defined
-   pid_t start_cmd_pid=0, autostart_pid=0;
-   if(start_cmd[0]!='\0') start_cmd_pid = spawn(start_cmd);
-   if(g_config->autostart_script[0]!='\0') autostart_pid = spawn(g_config->autostart_script);
+   if(start_cmd[0]!='\0')                    spawn(start_cmd);
+   if(g_config->autostart_script[0]!='\0')   spawn(g_config->autostart_script);
 
    // Run the main Wayland event loop
    wl_display_run(g_server->display);
 
    cleanupServer();
-
-   // clean up pid
-   if(start_cmd_pid>0){
-      kill(start_cmd_pid, SIGTERM);
-      waitpid(start_cmd_pid, NULL, 0);
-   }
-   if(autostart_pid>0){
-      kill(autostart_pid, SIGTERM);
-      waitpid(autostart_pid, NULL, 0);
-   }
 
    return EXIT_SUCCESS;
 }

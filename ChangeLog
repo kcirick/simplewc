@@ -4,6 +4,16 @@ TODO
 	* : Tags should be renamed to virtual workspace (vws)
 
 v0.3 -> v0.4 Changes
+2025-06-12
+	* include/output.h: add fixed_tag to fix a tag for an output 
+	* include/server.h: renamed from client_outline to simple_outline
+	* src/input.c: prevent move/resize client if the geometry is identical
+	* src/input.c: implement tablet capability
+	* src/client.c: set_client_geometry() takes a flag to request resize
+	* src/client.c: Fix border drawing for xwayland clients
+	* src/client.c: tileClient() can take 4 directions (UP,DOWN,LEFT,RIGHT)
+	* src/config.c: Add config options for tablet rotation and boundary
+
 2025-06-01
 	* meson.build: Remove simplewc-msg executable
 	* src/main.c: add --exit option to exit current simplewc instance

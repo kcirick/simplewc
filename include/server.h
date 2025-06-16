@@ -20,7 +20,8 @@ struct simple_server {
    struct wlr_scene_output_layout *scene_output_layout;
 
    // tags
-   //struct wl_list tags;
+   unsigned int current_tag;
+   unsigned int visible_tags;
 
    // output and decoration manager
    struct wl_list outputs;
@@ -36,6 +37,9 @@ struct simple_server {
    struct wlr_xdg_decoration_manager_v1 *xdg_decoration_manager;
    struct wl_listener new_decoration;
 
+   //struct wlr_foreign_toplevel_manager_v1 *foreign_toplevel_manager;
+   //struct wlr_ext_foreign_toplevel_list_v1 *foreign_toplevel_list;
+   
    struct wlr_xdg_activation_v1 *xdg_activation;
    struct wl_listener request_activate;
 
@@ -56,7 +60,7 @@ struct simple_server {
    struct wlr_layer_shell_v1 *layer_shell;
    struct wl_listener layer_new_surface;
 
-   // seat and input
+   // --- seat and input ---
    struct wlr_seat *seat;
 
    struct wl_list inputs;
@@ -86,6 +90,15 @@ struct simple_server {
    struct wl_listener start_drag;
    struct wl_listener destroy_drag_icon;
 
+   // tablet
+   struct wlr_tablet_manager_v2 *tablet_manager;
+   struct wl_list tablet_tools;
+
+   struct wl_listener tablet_tool_tip;
+   struct wl_listener tablet_tool_proximity;
+   struct wl_listener tablet_tool_axis;
+   struct wl_listener tablet_tool_button;
+
    // session idle notifier
    struct wlr_idle_notifier_v1 *idle_notifier;
    struct wlr_idle_inhibit_manager_v1 *idle_inhibit_manager;
@@ -112,13 +125,13 @@ struct simple_server {
    struct wlr_scene_rect *root_bg;
 
    struct simple_client *grabbed_client;
-   struct client_outline *grabbed_client_outline;
+   struct simple_outline *grabbed_client_outline;
    double grab_x, grab_y;
    struct wlr_box grab_box;
    uint32_t resize_edges;
 };
 
-struct client_outline {
+struct simple_outline {
    struct wlr_scene_tree *tree;
    int line_width;
 
@@ -139,8 +152,8 @@ struct simple_session_lock {
    struct wl_listener destroy;
 };
 
-struct client_outline* client_outline_create(struct wlr_scene_tree*, float*, int);
-void client_outline_set_size(struct client_outline*, int, int);
+struct simple_outline* simple_outline_create(struct wlr_scene_tree*, float*, int);
+void simple_outline_set_size(struct simple_outline*, int, int);
 
 void check_idle_inhibitor();
 

@@ -49,7 +49,7 @@ toggleClientFixed(struct simple_client *client)
    if(!client) return;
    
    if(client->fixed)
-      client->tag = client->output->current_tag;
+      client->tag = g_server->current_tag;
 
    client->fixed ^= 1;
 }
@@ -79,10 +79,10 @@ setClientFullscreen(struct simple_client *client, int fullscreen)
       new_geom.height = client->output->full_area.height;
    
       client->geom = new_geom;
-      set_client_geometry(client);
+      set_client_geometry(client, true);
    } else {
       client->geom = client->prev_geom;
-      set_client_geometry(client);
+      set_client_geometry(client, true);
    }
 }
 
@@ -100,32 +100,15 @@ maximizeClient(struct simple_client *client, int maximize)
 {
    if(!client) return;
 
-   if(maximize) {
-      client->prev_geom = client->geom;
-      int gap_width = g_config->tile_gap_width;
-      int bw = g_config->border_width;
+   int gap_width = g_config->tile_gap_width;
+   int bw = g_config->border_width;
 
-      struct wlr_box new_geom;
-      new_geom.x = client->output->usable_area.x + gap_width + bw;
-      new_geom.y = client->output->usable_area.y + gap_width + bw;
-      new_geom.width = client->output->usable_area.width - gap_width*2 - bw*2;
-      new_geom.height = client->output->usable_area.height - gap_width*2 - bw*2;
+   client->geom.x = client->output->usable_area.x + gap_width + bw;
+   client->geom.y = client->output->usable_area.y + gap_width + bw;
+   client->geom.width = client->output->usable_area.width - gap_width*2 - bw*2;
+   client->geom.height = client->output->usable_area.height - gap_width*2 - bw*2;
 
-      client->geom = new_geom;
-      set_client_geometry(client);
-   } else {
-      client->geom = client->prev_geom;
-      set_client_geometry(client);
-   }
-}
-
-void
-toggleClientMaximize(struct simple_client *client)
-{
-   if(!client) return;
-
-   client->maximized ^= 1;
-   maximizeClient(client, client->maximized);
+   set_client_geometry(client, true);
 }
 
 void
@@ -145,7 +128,6 @@ killClient(struct simple_client *client)
 void
 tileClient(struct simple_client *client, enum Direction direction)
 {
-   say(DEBUG, "tileClient");
    if(!client) return;
 
    struct simple_output* output = client->output;
@@ -156,23 +138,36 @@ tileClient(struct simple_client *client, enum Direction direction)
    if(direction==LEFT){
       new_geom.x = output->usable_area.x + gap_width + bw;
       new_geom.y = output->usable_area.y + gap_width + bw;
+      new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
+      new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
    }
    if(direction==RIGHT){
       new_geom.x = output->usable_area.x + output->usable_area.width/2 + gap_width/2 + bw;
       new_geom.y = output->usable_area.y + gap_width + bw;
+      new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
+      new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
    }
-   new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
-   new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
+   if(direction==UP){
+      new_geom.x = output->usable_area.x + gap_width + bw;
+      new_geom.y = output->usable_area.y + gap_width + bw;
+      new_geom.width = output->usable_area.width - gap_width*2 - bw*2;
+      new_geom.height = (output->usable_area.height - (gap_width*3))/2 - bw*2;
+   }
+   if(direction==DOWN){
+      new_geom.x = output->usable_area.x + gap_width + bw;
+      new_geom.y = output->usable_area.y + output->usable_area.height/2 + gap_width/2 + bw;
+      new_geom.width = output->usable_area.width - gap_width*2 - bw*2;
+      new_geom.height = (output->usable_area.height - (gap_width*3))/2 - bw*2;
+   }
 
-   say(DEBUG, " >> %d %d %d %d", new_geom.x, new_geom.y, new_geom.width, new_geom.height);
+   say(DEBUG, " >> %dx%d+%d+%d", new_geom.width, new_geom.height, new_geom.x, new_geom.y);
    client->geom = new_geom;
-   set_client_geometry(client);
+   set_client_geometry(client, true);
 }
 
 void
-cycleClients(struct simple_output *output){
-   say(DEBUG, "cycleClients");
-
+cycleClients(struct simple_output *output)
+{
    struct simple_client* client, *selected;
    if(g_server->grabbed_client)
       selected = g_server->grabbed_client;
@@ -184,7 +179,8 @@ cycleClients(struct simple_output *output){
    wl_list_for_each(client, &selected->link, link) {
       if(&client->link == &g_server->clients)
          continue; // wrap past the sentinel node
-      if(client->output==output && (client->fixed || (client->tag & output->visible_tags)))
+      //if(client->output==output && (client->fixed || (client->tag & g_server->visible_tags)))
+      if(client->fixed || (client->tag & g_server->visible_tags))
          break;
    }
 
@@ -192,14 +188,14 @@ cycleClients(struct simple_output *output){
    g_server->grabbed_client = client;
 
    // draw the border
-   struct client_outline* outline = g_server->grabbed_client_outline;
+   struct simple_outline* outline = g_server->grabbed_client_outline;
    if(!outline){
-      outline = client_outline_create(&g_server->scene->tree, g_config->border_colour[OUTLINE], g_config->border_width*2);
+      outline = simple_outline_create(&g_server->scene->tree, g_config->border_colour[OUTLINE], g_config->border_width*2);
       wlr_scene_node_place_above(&outline->tree->node, &g_server->layer_tree[LyrClient]->node);
       g_server->grabbed_client_outline = outline;
    }
 
-   client_outline_set_size(outline, client->geom.width, client->geom.height);
+   simple_outline_set_size(outline, client->geom.width, client->geom.height);
    wlr_scene_node_set_position(&outline->tree->node, client->geom.x, client->geom.y);
    //---
 }
@@ -270,7 +266,7 @@ get_top_client_from_output(struct simple_output* output, bool include_hidden)
    if(!output) return NULL;
    wl_list_for_each(client, &g_server->clients, link) {
       if(!client || &client->link == &g_server->clients) continue; 
-      if((include_hidden || client->visible) && client->output==output && (client->fixed || (client->tag & output->visible_tags)))
+      if((include_hidden || client->visible) && client->output==output && (client->fixed || (client->tag & g_server->visible_tags)))
          return client;
    }
    return NULL;
@@ -337,7 +333,6 @@ get_client_from_surface(struct wlr_surface *surface, struct simple_client **clie
 #if XWAYLAND
    struct wlr_xwayland_surface *xs = wlr_xwayland_surface_try_from_wlr_surface(root_surface);
    if (xs){
-      //say(DEBUG, "XS");
       *client = xs->data;
       type = (*client)->type;
       return type;
@@ -397,10 +392,12 @@ get_client_geometry(struct simple_client *client, struct wlr_box *geom)
 }
 
 void
-update_border_geometry(struct simple_client *client) {
-
+update_border_geometry(struct simple_client *client) 
+{
    struct wlr_box xdg_geom = {0};
-   wlr_xdg_surface_get_geometry(client->xdg_surface, &xdg_geom);
+
+   //wlr_xdg_surface_get_geometry(client->xdg_surface, &xdg_geom);
+   get_client_geometry(client, &xdg_geom);
    client->geom.width = xdg_geom.width;
    client->geom.height = xdg_geom.height;
 
@@ -422,10 +419,10 @@ update_border_geometry(struct simple_client *client) {
 }
 
 void 
-set_client_geometry(struct simple_client *client) 
+set_client_geometry(struct simple_client *client, bool request_resize) 
 {
    say(DEBUG, "size = %dx%d+%d+%d", client->geom.width, client->geom.height, client->geom.x, client->geom.y);
-   client->resize_requested = 1;
+   client->resize_requested = request_resize;
    if(client->type==XDG_SHELL_CLIENT){
       wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
       wlr_scene_node_set_position(&client->scene_surface_tree->node, 0, 0);
@@ -436,6 +433,7 @@ set_client_geometry(struct simple_client *client)
       wlr_scene_node_set_position(&client->scene_surface_tree->node, 0, 0);
       wlr_xwayland_surface_configure(client->xwl_surface, 
          client->geom.x, client->geom.y, client->geom.width, client->geom.height);
+      update_border_geometry(client);
 #endif
    }
 }
@@ -457,6 +455,7 @@ focus_client(struct simple_client *client, bool raise)
    if(!client) return;
 
    struct wlr_surface *surface = get_client_surface(client); 
+   if(!surface) return;
 
    if(raise){
       wlr_scene_node_raise_to_top(&client->scene_tree->node);
@@ -508,10 +507,6 @@ set_initial_geometry(struct simple_client* client)
    if(wlr_box_empty(&client->geom))
       get_client_geometry(client, &client->geom);
 
-   // Set initial coord based on cursor position
-   //client->geom.x = g_server->cursor->x;
-   //client->geom.y = g_server->cursor->y;
-
    struct simple_output* output = g_server->cur_output;
    struct wlr_box bounds = output->usable_area;
 
@@ -548,7 +543,6 @@ set_initial_geometry(struct simple_client* client)
          break;
    }
 
-   
    // check the boundaries
    if(client->geom.x<bounds.x+g_config->border_width) client->geom.x=bounds.x + g_config->border_width;
    if(client->geom.y<bounds.y+g_config->border_width) client->geom.y=bounds.y + g_config->border_width;
@@ -558,14 +552,15 @@ set_initial_geometry(struct simple_client* client)
    if((client->geom.y+client->geom.height+g_config->border_width) > (bounds.y+bounds.height)) 
       client->geom.y = bounds.y + bounds.height - client->geom.height - g_config->border_width;
 
-   say(DEBUG, " -> Initial geometry : %d %d %d %d", client->geom.x, client->geom.y, client->geom.width, client->geom.height);
+   say(DEBUG, " -> Initial geometry : %dx%d+%d+%d", client->geom.width, client->geom.height, client->geom.x, client->geom.y);
    // borders
    for(int i=0; i<4; i++){
       client->border[i] = wlr_scene_rect_create(client->scene_tree, 0, 0, g_config->border_colour[FOCUSED]);
       client->border[i]->node.data = client;
    }
 
-   set_client_geometry(client);
+   set_client_geometry(client, true);
+   //update_border_geometry(client);
 }
 
 // --- Common notify functions -------------------------------------------
@@ -597,7 +592,7 @@ map_notify(struct wl_listener *listener, void *data)
    }
 
    client->output = op;
-   client->tag = op->current_tag;
+   client->tag = g_server->current_tag;
    client->visible = true;
    client->fixed = false;
    client->urgent = false;
@@ -711,7 +706,7 @@ destroy_notify(struct wl_listener *listener, void *data)
    }
    free(client);
 
-   arrange_output(g_server->cur_output);
+   //arrange_output(g_server->cur_output);
    //focus_client(get_top_client_from_output(g_server->cur_output, false), true);
 
    print_server_info();
@@ -832,7 +827,7 @@ xwl_request_configure_notify(struct wl_listener *listener, void *data)
    if(!wlr_box_empty(&client->geom)){
       client->geom.x = event->x;          client->geom.y = event->y;
       client->geom.width = event->width;  client->geom.height = event->height;
-      set_client_geometry(client);
+      set_client_geometry(client, true);
    }
 
    wlr_xwayland_surface_configure(client->xwl_surface, event->x, event->y, event->width, event->height);

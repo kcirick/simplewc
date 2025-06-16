@@ -1,4 +1,3 @@
-
 #include <string.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
@@ -19,41 +18,32 @@
 
 //------------------------------------------------------------------------
 void
-arrange_output(struct simple_output* output)
+arrange_outputs()
 {
-   say(DEBUG, "arrange_output");
+   say(DEBUG, "arrange_outputs");
    struct simple_client* client, *focused_client=NULL;
 
    get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
    
-   wlr_scene_node_set_enabled(&output->fullscreen_bg->node, focused_client && focused_client->fullscreen);
+   if(focused_client)
+      wlr_scene_node_set_enabled(&focused_client->output->fullscreen_bg->node, focused_client->fullscreen);
 
    int n=0;
    bool is_client_visible=false;
    wl_list_for_each(client, &g_server->clients, link) {
       if(client->destroy_requested) continue;
-      is_client_visible = (client->visible && (client->fixed || (client->tag & output->visible_tags)));
+
+      if(client->output->fixed_tag<0)
+         is_client_visible = (client->visible && (client->fixed || (client->tag & g_server->visible_tags)));
+      else
+         is_client_visible = (client->visible && (client->fixed || (client->tag & client->output->fixed_tag)));
+
       if(is_client_visible) n++;
       set_client_border_colour(client, client==focused_client ? FOCUSED : UNFOCUSED);
-      
-      if(client->output!=output){  
-         if(client->visible && (client->fixed || (client->tag & client->output->visible_tags)))
-            continue;
-
-         client->geom.x += output->usable_area.x - client->output->usable_area.x; 
-         client->geom.y += output->usable_area.y - client->output->usable_area.y;
-         set_client_geometry(client);
-         client->output = output;
-      }
       wlr_scene_node_set_enabled(&client->scene_tree->node, is_client_visible);
    }
 
-   if(focused_client && focused_client->fullscreen)
-         wlr_scene_node_set_enabled(&output->fullscreen_bg->node, 1);
-   else
-         wlr_scene_node_set_enabled(&output->fullscreen_bg->node, 0);
-
-   focused_client = get_top_client_from_output(output, false);
+   focused_client = get_top_client_from_output(g_server->cur_output, false);
    if(focused_client)
       focus_client(focused_client, true);
    else
@@ -78,11 +68,34 @@ get_output_at(double x, double y)
    return NULL;
 }
 
+void
+toggleFixedTag(){
+   struct simple_output* output = g_server->cur_output;
+
+   if(output->fixed_tag<0) {
+      output->fixed_tag = g_server->current_tag;
+
+      // draw the border
+      int bw = g_config->border_width;
+      struct simple_outline* outline = simple_outline_create(&g_server->scene->tree, g_config->border_colour[FIXED], bw);
+      output->outline = outline;
+      wlr_scene_node_place_above(&outline->tree->node, &g_server->layer_tree[LyrBottom]->node);
+
+      simple_outline_set_size(outline, output->usable_area.width-2*bw, output->usable_area.height-2*bw);
+      wlr_scene_node_set_position(&outline->tree->node, output->usable_area.x+bw, output->usable_area.y+bw);
+      //---
+   } else {
+      output->fixed_tag = -1;
+
+      wlr_scene_node_destroy(&output->outline->tree->node);
+   }
+}
+
 //--- Output notify functions --------------------------------------------
 static void 
 output_frame_notify(struct wl_listener *listener, void *data) 
 {
-   say(DEBUG, "output_frame_notify");
+   //say(DEBUG, "output_frame_notify");
    struct simple_output *output = wl_container_of(listener, output, frame);
    struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(g_server->scene, output->wlr_output);
    
@@ -161,7 +174,7 @@ output_destroy_notify(struct wl_listener *listener, void *data)
 
       if(client->geom.x > output->usable_area.x){
          client->geom.x = client->geom.x - output->usable_area.width;
-         set_client_geometry(client);
+         set_client_geometry(client, false);
       }
       struct simple_output *new_op = get_output_at(client->geom.x, client->geom.y);
       if(new_op->wlr_output->enabled && new_op==g_server->cur_output) 
@@ -209,14 +222,14 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
       output->usable_area = output->full_area = box;
 
       arrange_layers(output);
-      arrange_output(output);
+      arrange_outputs();
 
       output->gamma_lut_changed = true;
       config_head->state.x = box.x;
       config_head->state.y = box.y;
    }
 
-   if(config)
+   if(config && g_server->output_manager)
       wlr_output_manager_v1_set_configuration(g_server->output_manager, config);
    else
       say(ERROR, "wlr_output_manager_v1_set_configuration failed");
@@ -256,13 +269,7 @@ new_output_notify(struct wl_listener *listener, void *data)
    wlr_output->data = output;
 
    // set default tag - do this before adding the current output to the global list
-   struct simple_output *test;
-   int test_tag=0;
-   wl_list_for_each(test, &g_server->outputs, link) {
-      if(test->current_tag == TAGMASK(test_tag)) test_tag++; 
-   }
-   output->current_tag = TAGMASK(test_tag);
-   output->visible_tags = TAGMASK(test_tag);
+   output->fixed_tag = -1;
 
    wl_list_init(&output->ipc_outputs);   // ipc addition
 
@@ -296,9 +303,6 @@ new_output_notify(struct wl_listener *listener, void *data)
    struct wlr_box geom;
    wlr_output_layout_get_box(g_server->output_layout, NULL, &geom);
 
-   //memset(&output->full_area, 0, sizeof(output->full_area));
-   //output->full_area = geom;
-   
    wlr_scene_node_set_position(&g_server->root_bg->node, geom.x, geom.y);
    wlr_scene_rect_set_size(g_server->root_bg, geom.width, geom.height);
    wlr_scene_node_set_position(&g_server->locked_bg->node, geom.x, geom.y);

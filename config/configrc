@@ -36,6 +36,14 @@ focus_type = 1
 #--- Touchpad settings -----
 touchpad_tap_click = false
 
+#--- Tablet settings -----
+# rotation can be [0, 90, 180, 270]
+#tablet_rotation = 0
+
+# boundary = min max (in % of the area)
+tablet_boundary_x = 0.2 0.8
+tablet_boundary_y = 0 1
+
 #--- Key Bindings -----
 KEY = A+q QUIT 0
 #--- Spawns
@@ -44,7 +52,7 @@ KEY = S+A+Return SPAWN foot
 #--- Client actions
 KEY = A+Tab CLIENT cycle
 KEY = A+k CLIENT kill
-KEY = A+m CLIENT toggle_maximize
+KEY = A+m CLIENT maximize
 KEY = A+f CLIENT toggle_fixed
 KEY = A+v CLIENT toggle_visible
 KEY = A+w CLIENT toggle_fullscreen
@@ -58,6 +66,7 @@ KEY = A+C+3 TAG toggle
 KEY = A+S+1 CLIENT send_to_tag
 KEY = A+S+2 CLIENT send_to_tag
 KEY = A+S+3 CLIENT send_to_tag
+KEY = A+C+f TAG fix
 #--- Move/Resize
 KEY = A+Left CLIENT move
 KEY = A+Right CLIENT move

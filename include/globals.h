@@ -14,6 +14,7 @@
 #define COMPOSITOR_VERSION (5)
 #define FRAC_SCALE_VERSION (1)
 #define DWL_IPC_VERSION (2)
+#define EXT_FOREIGN_TOPLEVEL_LIST_VERSION (1)
 
 #define N_LAYER_SHELL_LAYERS 4
 
@@ -32,7 +33,7 @@ enum CursorMode      { CURSOR_NORMAL, CURSOR_MOVE, CURSOR_RESIZE, CURSOR_PRESSED
 
 enum MessageType        { DEBUG, INFO, WARNING, ERROR, NMSG };
 enum ClientType         { XDG_SHELL_CLIENT, LAYER_SHELL_CLIENT, XWL_MANAGED_CLIENT, XWL_UNMANAGED_CLIENT };
-enum InputType          { INPUT_POINTER, INPUT_KEYBOARD, INPUT_MISC };
+enum InputType          { INPUT_POINTER, INPUT_KEYBOARD, INPUT_TABLET, INPUT_TABLET_PAD, INPUT_MISC };
 enum LayerType          { LyrBg, LyrBottom, LyrClient, LyrTop, LyrOverlay, LyrFS, LyrLock, NLayers }; // scene layers
 enum NodeDescriptorType { NODE_CLIENT, NODE_XDG_POPUP, NODE_LAYER_SURFACE, NODE_LAYER_POPUP };
 enum Direction          { LEFT, RIGHT, UP, DOWN };
@@ -55,6 +56,10 @@ struct simple_config {
 
    float background_colour[4];
    float border_colour[NBORDERCOL][4];
+
+   int tablet_rotation;
+   float tablet_boundary_x[2];
+   float tablet_boundary_y[2];
 
    int new_client_placement;
 
@@ -96,7 +101,7 @@ void readConfiguration(char*);
 
 //--- functions in main.c -----
 void say(int, const char*, ...);
-pid_t spawn(char*);
+void spawn(char*);
 void send_signal(int);
 
 #endif

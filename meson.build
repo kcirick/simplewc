@@ -72,6 +72,7 @@ dwl_proto = declare_dependency( sources: dwl_proto_files )
 
 wl_server_proto_files = []
 wl_server_proto_files += wlscanner_server_header.process(wl_proto_dir / 'stable/xdg-shell/xdg-shell.xml')
+wl_server_proto_files += wlscanner_server_header.process(wl_proto_dir / 'stable/tablet/tablet-v2.xml')
 wl_server_proto_files += wlscanner_server_header.process(wl_proto_dir / 'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml')
 wl_server_proto_files += wlscanner_server_header.process('protocols' / 'wlr-output-power-management-unstable-v1.xml')
 wl_server_proto_files += wlscanner_server_header.process('protocols' / 'wlr-layer-shell-unstable-v1.xml')

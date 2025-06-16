@@ -34,8 +34,9 @@
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_gamma_control_v1.h>
 #include <wlr/types/wlr_xdg_activation_v1.h>
-//
+#include <wlr/types/wlr_tablet_v2.h>
 //#include <wlr/types/wlr_foreign_toplevel_management_v1.h>
+//#include <wlr/types/wlr_ext_foreign_toplevel_list_v1.h>
 
 #include "dwl-ipc-unstable-v2-protocol.h"
 #include "globals.h"
@@ -48,17 +49,17 @@
 
 //--- client outline procedures ------------------------------------------
 static void
-client_outline_destroy_notify(struct wl_listener *listener, void *data)
+simple_outline_destroy_notify(struct wl_listener *listener, void *data)
 {
-   struct client_outline* outline = wl_container_of(listener, outline, destroy);
+   struct simple_outline* outline = wl_container_of(listener, outline, destroy);
    wl_list_remove(&outline->destroy.link);
    free(outline);
 }
 
-struct client_outline*
-client_outline_create(struct wlr_scene_tree *parent, float* border_colour, int line_width)
+struct simple_outline*
+simple_outline_create(struct wlr_scene_tree *parent, float* border_colour, int line_width)
 {
-   struct client_outline* outline = calloc(1, sizeof(struct client_outline));
+   struct simple_outline* outline = calloc(1, sizeof(struct simple_outline));
    outline->line_width = line_width;
    outline->tree = wlr_scene_tree_create(parent);
 
@@ -67,13 +68,13 @@ client_outline_create(struct wlr_scene_tree *parent, float* border_colour, int l
    outline->left = wlr_scene_rect_create(outline->tree, 0, 0, border_colour);
    outline->right = wlr_scene_rect_create(outline->tree, 0, 0, border_colour);
 
-   LISTEN(&outline->tree->node.events.destroy, &outline->destroy, client_outline_destroy_notify);
+   LISTEN(&outline->tree->node.events.destroy, &outline->destroy, simple_outline_destroy_notify);
    
    return outline;
 }
 
 void
-client_outline_set_size(struct client_outline* outline, int width, int height) {
+simple_outline_set_size(struct simple_outline* outline, int width, int height) {
    //borders
    int bw = outline->line_width;
    //top
@@ -94,20 +95,10 @@ client_outline_set_size(struct client_outline* outline, int width, int height) {
 void
 setCurrentTag(int tag, bool toggle)
 {
-   struct simple_output* output = g_server->cur_output;
-   struct simple_output* test_output;
-   unsigned int test_tagmask=0;
-
-   wl_list_for_each(test_output, &g_server->outputs, link) {
-      if(test_output==output) continue;
-      test_tagmask |= test_output->visible_tags;
-   }
-   if(TAGMASK(tag) & test_tagmask) return; // don't do anything if tag is visible on other outputs
-
    if(toggle)
-      output->visible_tags ^= TAGMASK(tag);
+      g_server->visible_tags ^= TAGMASK(tag);
    else 
-      output->visible_tags = output->current_tag = TAGMASK(tag);
+      g_server->visible_tags = g_server->current_tag = TAGMASK(tag);
 
    print_server_info();
 }
@@ -122,7 +113,7 @@ tileTag()
    // first count the number of clients
    int n=0;
    wl_list_for_each(client, &g_server->clients, link){
-      if(!(client->visible && client->output==output && (client->fixed || (client->tag & output->visible_tags)))) continue;
+      if(!(client->visible && client->output==output && (client->fixed || (client->tag & g_server->visible_tags)))) continue;
       n++;
    }
 
@@ -132,7 +123,7 @@ tileTag()
    int i=0;
    struct wlr_box new_geom;
    wl_list_for_each(client, &g_server->clients, link){
-      if(!(client->visible && client->output==output && (client->fixed || (client->tag & output->visible_tags)))) continue;
+      if(!(client->visible && client->output==output && (client->fixed || (client->tag & g_server->visible_tags)))) continue;
       
       if(i==0) { // master window
          new_geom.x = output->usable_area.x + gap_width + bw;
@@ -141,7 +132,7 @@ tileTag()
          new_geom.height = output->usable_area.height - gap_width*2 - bw*2;
          client->geom = new_geom;
 
-         set_client_geometry(client);
+         set_client_geometry(client, true);
       } else {
          new_geom.x = output->usable_area.x + output->usable_area.width/2 + gap_width/2 + bw;
          new_geom.width = (output->usable_area.width - (gap_width*3))/2 - bw*2;
@@ -150,11 +141,10 @@ tileTag()
          new_geom.height -= 2*bw;
          client->geom = new_geom;
          
-         set_client_geometry(client);
+         set_client_geometry(client, true);
       }
       i++;
    }
-   //arrange_output(output);
 }
 
 void
@@ -166,18 +156,17 @@ print_server_info()
    wl_list_for_each(output, &g_server->outputs, link) {
       ipc_output_printstatus(output);
       say(DEBUG, "output %s (%s)", output->wlr_output->name, output == g_server->cur_output?"*":"");
-      say(DEBUG, " -> tag = vis:%u / cur:%u", output->visible_tags, output->current_tag);
+      say(DEBUG, " -> tag = vis:%u / cur:%u", g_server->visible_tags, g_server->current_tag);
       wl_list_for_each(client, &g_server->clients, link) {
          struct simple_client* focused_client=NULL;
          get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
-         say(DEBUG, " -> client");
-         say(DEBUG, "    -> client focused = %b", client == focused_client); 
+         if(client->output != output) continue;
+
+         say(DEBUG, " -> client (%s/%s)", client->visible?"visible":"hidden", client==focused_client?"focused":"unfocused");
          say(DEBUG, "    -> client title = %s", get_client_title(client));
          say(DEBUG, "    -> client tag = %u", client->tag);
-         say(DEBUG, "    -> client fixed = %b", client->fixed);
-         say(DEBUG, "    -> client visible = %b", client->visible);
-         say(DEBUG, "    -> client fullscreen = %b", client->fullscreen);
-         say(DEBUG, "    -> client urgent = %b", client->urgent);
+         say(DEBUG, "    -> client fixed/fullscreen/urgent = %b/%b/%b", 
+                              client->fixed, client->fullscreen, client->urgent);
       }
    }
 }
@@ -414,22 +403,6 @@ prepareServer()
    if(!(g_server->backend = wlr_backend_autocreate(g_server->event_loop, &g_session)))
       say(ERROR, "Unable to create wlr_backend!");
 
-   // create a scene graph used to lay out windows
-   /* 
-    * | layer      | type          | example  |
-    * |------------|---------------|----------|
-    * | LyrLock    | lock-manager  | swaylock |
-    * | LyrFS      | layer-shell   | fullscrn |
-    * | LyrOverlay | layer-shell   |          |
-    * | LyrTop     | layer-shell   | waybar   |
-    * | LyrClient  | normal client |          |
-    * | LyrBottom  | layer-shell   |          |
-    * | LyrBg      | layer-shell   | wbg      |
-    */
-   g_server->scene = wlr_scene_create();
-   for(int i=0; i<NLayers; i++)
-      g_server->layer_tree[i] = wlr_scene_tree_create(&g_server->scene->tree);
-
    // create renderer
    if(!(g_server->renderer = wlr_renderer_autocreate(g_server->backend)))
       say(ERROR, "Unable to create wlr_renderer");
@@ -470,6 +443,22 @@ prepareServer()
 
    wl_list_init(&g_server->outputs);
    LISTEN(&g_server->backend->events.new_output, &g_server->new_output, new_output_notify);
+
+   // create a scene graph used to lay out windows
+   /* 
+    * | layer      | type          | example  |
+    * |------------|---------------|----------|
+    * | LyrLock    | lock-manager  | swaylock |
+    * | LyrFS      | layer-shell   | fullscrn |
+    * | LyrOverlay | layer-shell   |          |
+    * | LyrTop     | layer-shell   | waybar   |
+    * | LyrClient  | normal client |          |
+    * | LyrBottom  | layer-shell   |          |
+    * | LyrBg      | layer-shell   | wbg      |
+    */
+   g_server->scene = wlr_scene_create();
+   for(int i=0; i<NLayers; i++)
+      g_server->layer_tree[i] = wlr_scene_tree_create(&g_server->scene->tree);
 
    g_server->scene_output_layout = wlr_scene_attach_output_layout(g_server->scene, g_server->output_layout);
 
@@ -522,6 +511,20 @@ prepareServer()
    g_server->xdg_decoration_manager = wlr_xdg_decoration_manager_v1_create(g_server->display);
    LISTEN(&g_server->xdg_decoration_manager->events.new_toplevel_decoration, &g_server->new_decoration, new_decoration_notify);
 
+   // Foreign toplevel manager
+   //g_server->foreign_toplevel_manager = wlr_foreign_toplevel_manager_v1_create(g_server->display);
+
+   //g_server->foreign_toplevel_list = 
+   //   wlr_ext_foreign_toplevel_list_v1_create(g_server->display, EXT_FOREIGN_TOPLEVEL_LIST_VERSION);
+
+   // tablet manager
+   g_server->tablet_manager = wlr_tablet_v2_create(g_server->display);
+   wl_list_init(&g_server->tablet_tools);
+
+   // set default tag 
+   g_server->current_tag = TAGMASK(0);
+   g_server->visible_tags = TAGMASK(0);
+
 
    // Set up IPC interface
    wl_global_create(g_server->display, &zdwl_ipc_manager_v2_interface, DWL_IPC_VERSION, NULL, ipc_manager_bind);
@@ -557,15 +560,12 @@ startServer()
    say(INFO, " -> Wayland server is running on WAYLAND_DISPLAY=%s ...", socket);
 
 #if XWAYLAND
-   if(setenv("DISPLAY", g_server->xwayland->display_name, true) < 0)
-      say(WARNING, " -> Unable to set DISPLAY for xwayland");
-   else 
-      say(INFO, " -> XWayland is running on display %s", g_server->xwayland->display_name);
+   setenv("DISPLAY", g_server->xwayland->display_name, true);
+   say(INFO, " -> XWayland is running on display %s", g_server->xwayland->display_name);
 #endif
 
    // choose initial output based on cursor position
    g_server->cur_output = get_output_at(g_server->cursor->x, g_server->cursor->y);
-
 }
 
 void 
@@ -574,15 +574,32 @@ cleanupServer()
    say(INFO, "Cleaning up Wayland server");
 
 #if XWAYLAND
-   g_server->xwayland = NULL;
    wlr_xwayland_destroy(g_server->xwayland);
+   g_server->xwayland = NULL;
 #endif
 
    wl_display_destroy_clients(g_server->display);
+
+   wl_list_remove(&g_server->new_input.link);
+
+   wl_list_remove(&g_server->xdg_new_toplevel.link);
+   wl_list_remove(&g_server->xdg_new_popup.link);
+
+   wl_list_remove(&g_server->new_output.link);
+   wl_list_remove(&g_server->output_layout_change.link);
+   wl_list_remove(&g_server->output_manager_apply.link);
+   wl_list_remove(&g_server->output_manager_test.link);
+
    wlr_xcursor_manager_destroy(g_server->cursor_manager);
    wlr_output_layout_destroy(g_server->output_layout);
+
+   wlr_allocator_destroy(g_server->allocator);
+   wlr_renderer_destroy(g_server->renderer);
+   wlr_backend_destroy(g_server->backend);
+
    wl_display_destroy(g_server->display);
-   // Destroy after the wayland display
+   
+   // destroy after wayland display
    wlr_scene_node_destroy(&g_server->scene->tree.node);
 }
 

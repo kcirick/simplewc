@@ -12,8 +12,11 @@ struct simple_output {
    struct wlr_scene_rect *fullscreen_bg;
 
    // tags
-   unsigned int current_tag;
-   unsigned int visible_tags;
+   int fixed_tag;
+   //unsigned int current_tag;
+   //unsigned int visible_tags;
+
+   struct simple_outline *outline;
 
    struct wl_listener frame;
    struct wl_listener request_state;
@@ -31,8 +34,10 @@ struct simple_output {
 void new_output_notify(struct wl_listener *, void *); 
 void output_layout_change_notify(struct wl_listener *, void *); 
 
+void toggleFixedTag();
+
 struct simple_output* get_output_at(double, double);
 
-void arrange_output(struct simple_output*);
+void arrange_outputs();
 
 #endif

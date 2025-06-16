@@ -12,6 +12,9 @@
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_relative_pointer_v1.h>
 #include <wlr/types/wlr_pointer_constraints_v1.h>
+#include <wlr/types/wlr_tablet_v2.h>
+#include <wlr/types/wlr_tablet_tool.h>
+#include <wlr/types/wlr_tablet_pad.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/edges.h>
 #include <wlr/util/region.h>
@@ -118,8 +121,8 @@ kb_modifiers_notify(struct wl_listener *listener, void *data)
          wl_list_insert(&g_server->clients, &client->link);
          g_server->grabbed_client=NULL;
 
-         //focus_client(client, true, true);
-         arrange_output(g_server->cur_output);
+         focus_client(client, true);
+         arrange_outputs();
       }
    }
 
@@ -190,13 +193,19 @@ process_cursor_move(uint32_t time)
    struct simple_client *client = g_server->grabbed_client;
    if(!client || client->fullscreen) return;
 
-   client->geom.x = g_server->cursor->x - g_server->grab_x;
-   client->geom.y = g_server->cursor->y - g_server->grab_y;
+   int new_x = g_server->cursor->x - g_server->grab_x;
+   int new_y = g_server->cursor->y - g_server->grab_y;
+
+   //Don't do anything if geometry is identical
+   if(client->geom.x==new_x && client->geom.y==new_y) return;
 
    //client->output = get_output_at(g_server->cursor->x, g_server->cursor->y);
    //client->tag = client->output->current_tag;
+   
+   client->geom.x = new_x;
+   client->geom.y = new_y;
 
-   set_client_geometry(client);
+   set_client_geometry(client, false);
 }
 
 static void 
@@ -232,6 +241,10 @@ process_cursor_resize(uint32_t time)
          new_right = new_left + 1;
    }
 
+   // don't do anything if geometry is identical
+   if (client->geom.x==new_left && client->geom.y==new_top &&
+         client->geom.width==(new_right-new_left) && client->geom.height==(new_bottom-new_top)) return;
+
    client->geom.x = new_left;
    client->geom.y = new_top;
    client->geom.width = new_right - new_left;
@@ -240,7 +253,7 @@ process_cursor_resize(uint32_t time)
    if(client->type==XDG_SHELL_CLIENT)
       wlr_xdg_toplevel_set_bounds(client->xdg_surface->toplevel, client->geom.width, client->geom.height);
    
-   set_client_geometry(client);
+   set_client_geometry(client, true);
 }
 
 static void 
@@ -326,6 +339,70 @@ process_cursor_motion(uint32_t time, struct wlr_input_device *device, double dx,
    }
 } 
 
+static void
+process_cursor_button(uint32_t time, struct wlr_input_device *device, uint32_t button, enum wl_pointer_button_state state)
+{
+   double sx, sy;
+   struct wlr_surface *surface = NULL;
+   struct simple_client *client = NULL;
+   int ctype = get_client_at(g_server->cursor->x, g_server->cursor->y, &client, &surface, &sx, &sy);
+
+   struct mousemap *mousemap;
+   switch (state) {
+      case WL_POINTER_BUTTON_STATE_RELEASED:
+         // button release
+         if(!(g_server->active_constraint && g_server->active_constraint->type==WLR_POINTER_CONSTRAINT_V1_LOCKED))
+            wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");
+
+         if(client && g_server->grabbed_client){
+            struct simple_output *test_output = get_output_at(g_server->cursor->x, g_server->cursor->y);
+            if(test_output->wlr_output->enabled && test_output != client->output){
+               client->output = test_output; 
+               client->tag = g_server->current_tag;
+            }
+         }
+
+         g_server->cursor_mode = CURSOR_NORMAL;
+         g_server->grabbed_client = NULL;
+
+         //wlr_seat_pointer_notify_button(g_server->seat, event->time_msec, event->button, event->state);
+         //return;
+         break;
+      case WL_POINTER_BUTTON_STATE_PRESSED:
+         // button press
+         g_server->cursor_mode = CURSOR_PRESSED;
+         struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(g_server->seat);
+         uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard);
+         // press on desktop
+         if(!client && ctype==-1) {
+            say(DEBUG, "press on desktop");
+            wl_list_for_each(mousemap, &g_config->mouse_bindings, link) {
+               if(modifiers ^ mousemap->mask) continue;
+
+               if(mousemap->context==CONTEXT_ROOT && button == mousemap->button){
+                  mouse_function(NULL, mousemap, 0);
+                  return;
+               }
+            }
+         } else if(ctype!=LAYER_SHELL_CLIENT) { //press on client
+            focus_client(client, true);
+            uint32_t resize_edges = get_resize_edges(client, g_server->cursor->x, g_server->cursor->y);
+            wl_list_for_each(mousemap, &g_config->mouse_bindings, link) {
+               if(modifiers ^ mousemap->mask) continue;
+
+               if(mousemap->context==CONTEXT_CLIENT && button == mousemap->button){
+                  mouse_function(client, mousemap, resize_edges);
+                  return;
+               }
+            }
+         } else {
+            say(DEBUG, "Layer Shell input");
+            input_focus_surface(surface);
+         }
+         break;
+   } // switch
+}
+
 //--- cursor notify functions --------------------------------------------
 static void 
 cursor_motion_notify(struct wl_listener *listener, void *data) 
@@ -362,67 +439,8 @@ cursor_button_notify(struct wl_listener *listener, void *data)
 
    if(g_server->locked) return;
 
-   double sx, sy;
-   struct wlr_surface *surface = NULL;
-   struct simple_client *client = NULL;
-   int ctype = get_client_at(g_server->cursor->x, g_server->cursor->y, &client, &surface, &sx, &sy);
+   process_cursor_button(event->time_msec, &event->pointer->base, event->button, event->state);
 
-   struct mousemap *mousemap;
-   switch (event->state) {
-      case WLR_BUTTON_RELEASED:
-         // button release
-         if(!(g_server->active_constraint && g_server->active_constraint->type==WLR_POINTER_CONSTRAINT_V1_LOCKED))
-            wlr_cursor_set_xcursor(g_server->cursor, g_server->cursor_manager, "left_ptr");
-
-         if(client && g_server->grabbed_client){
-            struct simple_output *test_output = get_output_at(g_server->cursor->x, g_server->cursor->y);
-            if(test_output->wlr_output->enabled && test_output != client->output){
-               client->output = test_output; 
-               client->tag = client->output->current_tag;
-            }
-         }
-
-         g_server->cursor_mode = CURSOR_NORMAL;
-         g_server->grabbed_client = NULL;
-
-         //wlr_seat_pointer_notify_button(g_server->seat, event->time_msec, event->button, event->state);
-         //return;
-         break;
-      case WLR_BUTTON_PRESSED:
-         // button press
-         g_server->cursor_mode = CURSOR_PRESSED;
-         struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(g_server->seat);
-         uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard);
-         // press on desktop
-         if(!client && ctype==-1) {
-            say(DEBUG, "press on desktop");
-            wl_list_for_each(mousemap, &g_config->mouse_bindings, link) {
-               if(modifiers ^ mousemap->mask) continue;
-
-               if(mousemap->context==CONTEXT_ROOT && event->button == mousemap->button){
-                  mouse_function(NULL, mousemap, 0);
-                  return;
-               }
-            }
-         } else if(ctype!=LAYER_SHELL_CLIENT) { //press on client
-            focus_client(client, true);
-            uint32_t resize_edges = get_resize_edges(client, g_server->cursor->x, g_server->cursor->y);
-            wl_list_for_each(mousemap, &g_config->mouse_bindings, link) {
-               if(modifiers ^ mousemap->mask) continue;
-
-               if(mousemap->context==CONTEXT_CLIENT && event->button == mousemap->button){
-                  mouse_function(client, mousemap, resize_edges);
-                  return;
-               }
-            }
-         } else {
-            say(DEBUG, "Layer Shell input");
-            input_focus_surface(surface);
-         }
-         break;
-   } // switch
-   
-   // Notify the client with pointer focus that a button press has occurred
    wlr_seat_pointer_notify_button(g_server->seat, event->time_msec, event->button, event->state);
 }
 
@@ -502,6 +520,205 @@ start_drag_notify(struct wl_listener *listener, void *data)
    LISTEN(&drag->icon->events.destroy, &g_server->destroy_drag_icon, destroy_drag_icon_notify);
 }
 
+//--- Tablet notify functions --------------------------------------------
+static void
+tablet_transform_coords(double *x, double *y)
+{
+   // adjust for tablet rotation
+   say(DEBUG, "rotation = %d", g_config->tablet_rotation);
+   if(g_config->tablet_rotation==90){
+      double tmp = *x;
+      *x = (double)1.0 - *y;
+      *y = tmp;
+   } else if(g_config->tablet_rotation==180){
+      *x = (double)1.0 - *x;
+      *y = (double)1.0 - *y;
+   } else if(g_config->tablet_rotation==270){
+      double tmp = *x;
+      *x = *y;
+      *y = (double)1.0 - tmp;
+   }
+
+   //adjust for boundary limit/scaling
+   double x_min = g_config->tablet_boundary_x[0];
+   double x_max = g_config->tablet_boundary_x[1];
+   double y_min = g_config->tablet_boundary_y[0];
+   double y_max = g_config->tablet_boundary_y[1];
+   say(DEBUG, "boundary_x = %d %d / boundary_y = %d %d", x_min, x_max, y_min, y_max);
+   *x = (*x-x_min) / (x_max - x_min);
+   *y = (*y-y_min) / (y_max - y_min);
+}
+
+static void
+tablet_tool_set_cursor_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "tool_set_cursor_notify");
+   struct simple_tablet_tool *tool = wl_container_of(listener, tool, set_cursor);
+   struct wlr_tablet_v2_event_cursor *ev = data;
+
+   struct wlr_seat_client *focused_client = g_server->seat->pointer_state.focused_client;
+   if(ev->seat_client != focused_client) return;
+
+   wlr_cursor_set_surface(g_server->cursor, ev->surface, ev->hotspot_x, ev->hotspot_y);
+}
+
+static void
+tablet_tool_destroy_notify(struct wl_listener *listener, void *data)
+{
+   struct simple_tablet_tool *tool = wl_container_of(listener, tool, destroy);
+
+   wl_list_remove(&tool->destroy.link);
+   wl_list_remove(&tool->set_cursor.link);
+}
+
+static void
+tablet_tool_create(struct wlr_tablet_tool *wlr_tablet_tool, struct wlr_tablet_v2_tablet *tablet_v2)
+{
+   say(DEBUG, "tablet_tool_create");
+
+   struct simple_tablet_tool *tool = calloc(1, sizeof(struct simple_tablet_tool));
+   tool->tool_v2 = wlr_tablet_tool_create(g_server->tablet_manager, g_server->seat, wlr_tablet_tool);
+   tool->tablet_v2 = tablet_v2;
+   wlr_tablet_tool->data = tool;
+
+   say(DEBUG, " -> Tablet tool capabilities: %s %s %s %s %s %s",
+         wlr_tablet_tool->tilt ? "tilt":"",
+         wlr_tablet_tool->pressure ? "pressure":"",
+         wlr_tablet_tool->distance ? "distance":"",
+         wlr_tablet_tool->rotation ? "rotation":"",
+         wlr_tablet_tool->slider ? "slider":"",
+         wlr_tablet_tool->wheel ? "wheel":"");
+
+   LISTEN(&wlr_tablet_tool->events.destroy, &tool->destroy, tablet_tool_destroy_notify);
+   LISTEN(&tool->tool_v2->events.set_cursor, &tool->set_cursor, tablet_tool_set_cursor_notify);
+
+   wl_list_insert(&g_server->tablet_tools, &tool->link);
+}
+
+static void
+tablet_tool_tip_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "cursor_tool_tip_notify");
+   struct wlr_tablet_tool_tip_event *ev = data;
+   struct simple_tablet_tool *tool = ev->tool->data;
+
+   wlr_idle_notifier_v1_notify_activity(g_server->idle_notifier, g_server->seat);
+
+   double sx, sy;
+   struct wlr_surface *surface = NULL;
+   struct simple_client *client = NULL;
+   get_client_at(g_server->cursor->x, g_server->cursor->y, &client, &surface, &sx, &sy);
+
+   if(tool && (surface || wlr_tablet_tool_v2_has_implicit_grab(tool->tool_v2))) {
+      if(ev->state==WLR_TABLET_TOOL_TIP_DOWN) {
+         //wlr_seat_pointer_end_grab(g_server->seat);
+         wlr_tablet_v2_tablet_tool_notify_down(tool->tool_v2);
+         wlr_tablet_tool_v2_start_implicit_grab(tool->tool_v2);
+      } else if(ev->state==WLR_TABLET_TOOL_TIP_UP) {
+         wlr_tablet_v2_tablet_tool_notify_up(tool->tool_v2);
+         if(!surface)
+            wlr_tablet_v2_tablet_tool_notify_proximity_out(tool->tool_v2);
+      }
+   }
+   //process_cursor_button(ev->time_msec, &ev->tablet->base, BTN_LEFT, 
+   //      ev->state==WLR_TABLET_TOOL_TIP_UP? WL_POINTER_BUTTON_STATE_RELEASED:WL_POINTER_BUTTON_STATE_PRESSED);
+
+   wlr_seat_pointer_notify_button(g_server->seat, ev->time_msec, BTN_LEFT, ev->state);
+}
+
+static void
+tablet_tool_axis_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "cursor_tool_axis_notify");
+   struct wlr_tablet_tool_axis_event *ev = data;
+   struct simple_tablet_tool *tool = ev->tool->data;
+   
+   bool change_x = ev->updated_axes & WLR_TABLET_TOOL_AXIS_X;
+   bool change_y = ev->updated_axes & WLR_TABLET_TOOL_AXIS_Y;
+
+   //say(DEBUG, "tablet->width_mm = %f / height_mm = %f", ev->tablet->width_mm, ev->tablet->height_mm);
+   say(DEBUG, "ev->x = %f / ev->y = %f", ev->x, ev->y);
+   double xx = tool->x = change_x?ev->x:tool->x;
+   double yy = tool->y = change_y?ev->y:tool->y;
+   tablet_transform_coords(&xx, &yy);
+   say(DEBUG, "xx = %f / yy = %f", xx, yy);
+
+   wlr_cursor_warp_absolute(g_server->cursor, &ev->tablet->base, xx, yy);
+
+
+   double sx, sy;
+   struct wlr_surface *surface = NULL;
+   struct simple_client *client = NULL;
+   get_client_at(g_server->cursor->x, g_server->cursor->y, &client, &surface, &sx, &sy);
+
+   if(surface){
+      if(surface != tool->tool_v2->focused_surface && !tool->tool_v2->is_down) 
+         wlr_tablet_v2_tablet_tool_notify_proximity_in(tool->tool_v2, tool->tablet_v2, surface);
+
+      wlr_tablet_v2_tablet_tool_notify_motion(tool->tool_v2, sx, sy);
+
+      if(ev->updated_axes & WLR_TABLET_TOOL_AXIS_PRESSURE)
+         wlr_tablet_v2_tablet_tool_notify_pressure(tool->tool_v2, ev->pressure);
+
+      if(ev->updated_axes & (WLR_TABLET_TOOL_AXIS_TILT_X | WLR_TABLET_TOOL_AXIS_TILT_Y))
+         wlr_tablet_v2_tablet_tool_notify_tilt(tool->tool_v2, ev->tilt_x, ev->tilt_y);
+
+      if(ev->updated_axes & WLR_TABLET_TOOL_AXIS_ROTATION)
+         wlr_tablet_v2_tablet_tool_notify_rotation(tool->tool_v2, ev->rotation);
+
+      //wlr_seat_pointer_notify_enter(g_server->seat, surface, sx, sy);
+      //wlr_seat_pointer_notify_motion(g_server->seat, ev->time_msec, sx, sy);
+   } 
+   //process_cursor_motion(ev->time_msec, &ev->tablet->base, ev->dx, ev->dy, ev->dx, ev->dy);
+}
+
+static void
+tablet_tool_proximity_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "cursor_tool_proximity_notify");
+   struct wlr_tablet_tool_proximity_event *ev = data;
+   struct wlr_tablet_tool *tool = ev->tool;
+
+   struct simple_input *input=NULL;
+   struct simple_input *temp_input;
+   wl_list_for_each(temp_input, &g_server->inputs, link) {
+      if(temp_input->device==&ev->tablet->base){
+         input = temp_input;
+         break;
+      }
+   }
+
+   if(!tool->data) {
+      if(!ev->tablet || !input){
+         say(DEBUG, "No tablet for tablet tool");
+         return;
+      }
+      tablet_tool_create(tool, input->tablet_v2);
+   }
+
+   struct simple_tablet_tool* simple_tool = tool->data;
+   if(!simple_tool){
+      say(DEBUG, "tablet tool not initialized");
+      return;
+   }
+   
+   double xx = ev->x;
+   double yy = ev->y;
+   tablet_transform_coords(&xx, &yy);
+
+   if(ev->state == WLR_TABLET_TOOL_PROXIMITY_IN)
+      process_cursor_motion(ev->time_msec, &ev->tablet->base, xx, yy, 0, 0);
+   if(ev->state == WLR_TABLET_TOOL_PROXIMITY_OUT)
+      wlr_tablet_v2_tablet_tool_notify_proximity_out(simple_tool->tool_v2);
+
+}
+
+static void
+tablet_tool_button_notify(struct wl_listener *listener, void *data)
+{
+   say(DEBUG, "cursor_tool_button_notify");
+}
+
 //--- Input notify function ----------------------------------------------
 static void 
 input_destroy_notify(struct wl_listener *listener, void *data) 
@@ -547,7 +764,6 @@ new_input_notify(struct wl_listener *listener, void *data)
             libinput_device_config_tap_set_enabled(libinput_device, true);
          }
       }
-
    } else if (device->type == WLR_INPUT_DEVICE_KEYBOARD) {
       say(DEBUG, "New Input: KEYBOARD");
       input->type = INPUT_KEYBOARD;
@@ -573,6 +789,33 @@ new_input_notify(struct wl_listener *listener, void *data)
       LISTEN(&kb->events.key, &input->kb_key, kb_key_notify);
       
       wlr_seat_set_keyboard(g_server->seat, kb);
+   } else if (device->type == WLR_INPUT_DEVICE_TABLET) {
+      say(DEBUG, "New Input: TABLET");
+      input->type = INPUT_TABLET; 
+      struct wlr_tablet *tablet = wlr_tablet_from_input_device(device);
+      struct wlr_tablet_v2_tablet *tablet_v2 = wlr_tablet_create(g_server->tablet_manager, g_server->seat, device);
+      input->tablet = tablet;
+      input->tablet_v2 = tablet_v2;
+      wlr_cursor_attach_input_device(g_server->cursor, input->device);
+      
+      /*
+      if(wlr_input_device_is_libinput(device)){
+         struct libinput_device *tablet_device = wlr_libinput_get_device_handle(device);
+         struct libinput_device_group *tablet_group = libinput_device_get_device_group(tablet_device);
+      }*/
+
+      wlr_cursor_map_input_to_output(g_server->cursor, device, NULL);
+      wlr_cursor_map_input_to_region(g_server->cursor, device, NULL);
+
+   } else if (device->type == WLR_INPUT_DEVICE_TABLET_PAD) {
+      say(DEBUG, "New Input: TABLET_PAD");
+      input->type = INPUT_TABLET_PAD;
+
+      struct wlr_tablet_pad *pad = wlr_tablet_pad_from_input_device(device);
+      input->pad = pad;
+
+      //LISTEN(&pad->events.attach, &input->pad_
+
    } else {
       say(DEBUG, "New Input: SOMETHING ELSE");
       input->type = INPUT_MISC;
@@ -588,6 +831,7 @@ new_input_notify(struct wl_listener *listener, void *data)
             caps |= WL_SEAT_CAPABILITY_KEYBOARD;
             break;
          case WLR_INPUT_DEVICE_POINTER:
+         case WLR_INPUT_DEVICE_TABLET:
             caps |= WL_SEAT_CAPABILITY_POINTER;
             break;
          default:
@@ -613,6 +857,7 @@ input_init()
    LISTEN(&g_server->seat->events.request_start_drag, &g_server->request_start_drag, request_start_drag_notify);
    LISTEN(&g_server->seat->events.start_drag, &g_server->start_drag, start_drag_notify);
 
+   // Create a cursor - wlroots utility for tracking the cursor image shown on screen
    g_server->cursor = wlr_cursor_create();
    wlr_cursor_attach_output_layout(g_server->cursor, g_server->output_layout); 
 
@@ -631,6 +876,12 @@ input_init()
    LISTEN(&g_server->cursor->events.button, &g_server->cursor_button, cursor_button_notify);
    LISTEN(&g_server->cursor->events.axis, &g_server->cursor_axis, cursor_axis_notify);
    LISTEN(&g_server->cursor->events.frame, &g_server->cursor_frame, cursor_frame_notify);
+
+   //tablet events
+   LISTEN(&g_server->cursor->events.tablet_tool_tip, &g_server->tablet_tool_tip, tablet_tool_tip_notify);
+   LISTEN(&g_server->cursor->events.tablet_tool_proximity, &g_server->tablet_tool_proximity, tablet_tool_proximity_notify);
+   LISTEN(&g_server->cursor->events.tablet_tool_axis, &g_server->tablet_tool_axis, tablet_tool_axis_notify);
+   LISTEN(&g_server->cursor->events.tablet_tool_button, &g_server->tablet_tool_button, tablet_tool_button_notify);
 
    //input method init
    wlr_input_method_manager_v2_create(g_server->display);

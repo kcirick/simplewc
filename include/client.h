@@ -40,7 +40,6 @@ struct simple_client {
    bool fixed;
    bool urgent;
    bool fullscreen;
-   bool maximized;
 
    bool visible;
 
@@ -57,12 +56,10 @@ void sendClientToTag(struct simple_client*, int);
 void toggleClientFixed(struct simple_client*);
 void toggleClientVisible(struct simple_client*);
 void toggleClientFullscreen(struct simple_client*);
-void toggleClientMaximize(struct simple_client*);
-//void setClientFullscreen(struct simple_client*, int);
 void cycleClients(struct simple_output*);
 void killClient(struct simple_client*);
 void tileClient(struct simple_client*, enum Direction);
-//void maximizeClient(struct simple_client*);
+void maximizeClient(struct simple_client*, int);
 
 char * get_client_title(struct simple_client*);
 char * get_client_appid(struct simple_client*);
@@ -73,7 +70,7 @@ void focus_client(struct simple_client*, bool);
 void begin_interactive(struct simple_client*, enum CursorMode, uint32_t);
 
 void get_client_geometry(struct simple_client*, struct wlr_box*);
-void set_client_geometry(struct simple_client*);
+void set_client_geometry(struct simple_client*, bool);
 void set_client_border_colour(struct simple_client*, int);
 void update_border_geometry(struct simple_client*);
 

@@ -68,6 +68,10 @@ set_defaults()
    g_config->autostart_script[0] = '\0';
    g_config->xkb_layout[0] = '\0';
    g_config->xkb_options[0] = '\0';
+
+   g_config->tablet_rotation = 0;
+   g_config->tablet_boundary_x[0] = 0; g_config->tablet_boundary_x[1] = 1.;
+   g_config->tablet_boundary_y[0] = 0; g_config->tablet_boundary_y[1] = 1.;
 }
 
 void
@@ -127,6 +131,21 @@ readConfiguration(char* filename)
       if(!strcmp(id, "xkb_layout"))    strncpy(g_config->xkb_layout, value, sizeof g_config->xkb_layout);
       if(!strcmp(id, "xkb_options"))   strncpy(g_config->xkb_options, value, sizeof g_config->xkb_options);
 
+      if(!strcmp(id, "tablet_rotation"))  g_config->tablet_rotation = atoi(value);
+      if(!strcmp(id, "tablet_boundary_x")){
+         token = strtok(value, " ");
+         g_config->tablet_boundary_x[0] = atof(token);
+
+         token = strtok(NULL, " ");
+         g_config->tablet_boundary_x[1] = atof(token);
+      }
+      if(!strcmp(id, "tablet_boundary_y")){
+         token = strtok(value, " ");
+         g_config->tablet_boundary_y[0] = atof(token);
+
+         token = strtok(NULL, " ");
+         g_config->tablet_boundary_y[1] = atof(token);
+      }
       if(!strcmp(id, "KEY")){
          char binding[32];
          token = strtok(value, " ");

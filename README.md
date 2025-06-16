@@ -12,7 +12,7 @@ to teach myself the basics of window management.
  - Features:
    - No frills (menu, titlebar, icons, pixmap themes, etc...)
    - Text config file (default $HOME/.config/simplewc/configrc)
-   - Simple tiling (manual left-right tiling or one-shot auto-tile like DWL/DWM)
+   - Simple tiling (manual left-right or top-bottom tiling or one-shot auto-tile like DWL/DWM)
    - ~~simplewc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])~~
 
 [tinywl]: https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl
@@ -54,6 +54,7 @@ Default configuration file read from `$HOME/.config/simplewc/configrc`, and allo
  - window border width and colour
  - autostart script (e.g. set background, invoke status-bar, launch idle-inhibitor)
  - keyboard layout and options 
+ - input options (touchpad, tablet etc)
  - keybinds
  - mouse binds 
 
@@ -66,6 +67,8 @@ Please use [Github Issues Tracker][ghit] to report bugs and issues.
     - Goal: Continue to improve the compositor, optimize for efficiency.
     - Uses wlroots v0.18
     - Remove simplewc-msg
+    - Ability to fix (ie freeze) tag per output
+    - Tablet input support (limited)
   - 0.3 (2025-04-12) ([download][v03])
     - Goal: Better support for multihead and fullscreen
     - Uses wlroots v0.18
