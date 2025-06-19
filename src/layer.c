@@ -25,6 +25,9 @@ arrange_layer(struct simple_output *output, struct wl_list *list, struct wlr_box
       struct wlr_layer_surface_v1 *wlr_lsurface = surface->scene_layer_surface->layer_surface;
       //struct wlr_layer_surface_v1_state *state = &wlr_lsurface->current;
       
+      if(!wlr_lsurface->initialized)
+         continue;
+
       if(exclusive != (wlr_lsurface->current.exclusive_zone > 0)) 
          continue;
       

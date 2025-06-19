@@ -5,16 +5,17 @@ to teach myself the basics of window management.
 
 ## Description
 
- - Minimal stacking window manager for Wayland using wlroots (currently based on wlroots v0.18)
+ - Minimal stacking (floating) window manager for Wayland using [wlroots] (currently based on wlroots v0.19)
  - Not meant to be tiny or fast, but aims for simplicity in design and coding
  - Written in C
  - Built upon [tinywl], inspirations from [dwl] and [labwc]
  - Features:
-   - No frills (menu, titlebar, icons, pixmap themes, etc...)
+   - No frills (menu, titlebar, icons, animations, pixmap themes, etc...)
    - Text config file (default $HOME/.config/simplewc/configrc)
    - Simple tiling (manual left-right or top-bottom tiling or one-shot auto-tile like DWL/DWM)
    - ~~simplewc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])~~
 
+[wlroots]: https://gitlab.freedesktop.org/wlroots/wlroots
 [tinywl]: https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl
 [dwl]: https://codeberg.org/dwl/dwl
 [labwc]: https://github.com/labwc/labwc
@@ -25,7 +26,7 @@ to teach myself the basics of window management.
 
 v0.1
 
-<a href="https://i.redd.it/b7wqm1au7adc1.png" target="_blank"><img src="https://i.redd.it/b7wqm1au7adc1.png" width="450" /></a>
+![Scrrenshot v0.1](.assets/ss_2024-01-18.png)
 
 
 ### Usage
@@ -63,7 +64,10 @@ Default configuration file read from `$HOME/.config/simplewc/configrc`, and allo
 
 Please use [Github Issues Tracker][ghit] to report bugs and issues.
 
-  - 0.4 (Work in progress)
+  - 0.5 (work in progress)
+    - Goal: Continue to improve the compositor.
+    - Uses wlroots v0.19
+  - 0.4 (2025-06-16) ([download][v04])
     - Goal: Continue to improve the compositor, optimize for efficiency.
     - Uses wlroots v0.18
     - Remove simplewc-msg
@@ -93,5 +97,6 @@ Please use [Github Issues Tracker][ghit] to report bugs and issues.
 [v01]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.1.tar.gz
 [v02]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.2.tar.gz
 [v03]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.3.tar.gz
+[v04]: https://github.com/kcirick/simplewc/archive/refs/tags/v0.4.tar.gz
 [ghit]: https://github.com/kcirick/simplewc/issues
 

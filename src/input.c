@@ -82,6 +82,8 @@ create_pointer_constraint_notify(struct wl_listener *listener, void *data)
 void 
 input_focus_surface(struct wlr_surface *surface) 
 {
+   say(DEBUG, "focus_surface");
+
    if(!surface) {
       wlr_seat_keyboard_notify_clear_focus(g_server->seat);
       return;
@@ -729,7 +731,7 @@ input_destroy_notify(struct wl_listener *listener, void *data)
       wl_list_remove(&input->kb_modifiers.link);
       wl_list_remove(&input->kb_key.link);
       
-      ////
+      //
       struct simple_input *test_input=NULL;
       wl_list_for_each(test_input, &g_server->inputs, link) {
          if(test_input==input) continue;

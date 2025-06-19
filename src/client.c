@@ -222,7 +222,8 @@ begin_interactive(struct simple_client *client, enum CursorMode mode, uint32_t e
       //say(DEBUG, "CURSOR_RESIZE");
       struct wlr_box geo_box;
       if(client->type==XDG_SHELL_CLIENT) {
-         wlr_xdg_surface_get_geometry(client->xdg_surface, &geo_box);
+         //wlr_xdg_surface_get_geometry(client->xdg_surface, &geo_box);
+         geo_box = client->xdg_surface->geometry;
          geo_box.x = client->geom.x;
          geo_box.y = client->geom.y;
       } else {
@@ -380,7 +381,8 @@ void
 get_client_geometry(struct simple_client *client, struct wlr_box *geom)
 {
    if(client->type==XDG_SHELL_CLIENT){
-      wlr_xdg_surface_get_geometry(client->xdg_surface, geom);
+      //wlr_xdg_surface_get_geometry(client->xdg_surface, geom);
+      *geom = client->xdg_surface->geometry;
 #if XWAYLAND
    } else {
       geom->x = client->xwl_surface->x;
@@ -605,7 +607,7 @@ map_notify(struct wl_listener *listener, void *data)
       get_client_geometry(client, &client->geom);
       wlr_scene_node_reparent(&client->scene_tree->node, g_server->layer_tree[LyrOverlay]);
       wlr_scene_node_set_position(&client->scene_tree->node, client->geom.x, client->geom.y);
-      if(wlr_xwayland_or_surface_wants_focus(client->xwl_surface))
+      if(wlr_xwayland_surface_override_redirect_wants_focus(client->xwl_surface))
          focus_client(client, true);
       return;
    }
@@ -670,6 +672,9 @@ commit_notify(struct wl_listener *listener, void *data)
    if(client->xdg_surface->initial_commit){
       wlr_xdg_toplevel_set_wm_capabilities(client->xdg_surface->toplevel, WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN);
       wlr_xdg_toplevel_set_size(client->xdg_surface->toplevel, 0, 0);
+
+      //if(client->decoration)
+
       return;
    }
    
@@ -696,12 +701,15 @@ destroy_notify(struct wl_listener *listener, void *data)
    if(client->type==XDG_SHELL_CLIENT){
       wl_list_remove(&client->map.link);
       wl_list_remove(&client->unmap.link);
+      wl_list_remove(&client->commit.link);
 #if XWAYLAND
    } else {
       wl_list_remove(&client->associate.link);
       wl_list_remove(&client->dissociate.link);
       wl_list_remove(&client->request_activate.link);
       wl_list_remove(&client->request_configure.link);
+      wl_list_remove(&client->set_title.link);
+      wl_list_remove(&client->set_hints.link);
 #endif
    }
    free(client);

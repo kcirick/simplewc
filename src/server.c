@@ -196,8 +196,10 @@ new_decoration_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "new_decoration_notify");
    struct wlr_xdg_toplevel_decoration_v1 *decoration = data;
+   struct simple_client *client = decoration->toplevel->base->data;
 
-   wlr_xdg_toplevel_decoration_v1_set_mode(decoration, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+   if(client && client->xdg_surface->initialized)
+      wlr_xdg_toplevel_decoration_v1_set_mode(decoration, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 }
 
 static void
@@ -425,7 +427,7 @@ prepareServer()
    wlr_single_pixel_buffer_manager_v1_create(g_server->display);
    wlr_primary_selection_v1_device_manager_create(g_server->display);
    wlr_fractional_scale_manager_v1_create(g_server->display, FRAC_SCALE_VERSION);
-   wlr_presentation_create(g_server->display, g_server->backend);
+   wlr_presentation_create(g_server->display, g_server->backend, PRESENTATION_VERSION);
    
    // initialize interface used to implement urgency hints TODO
    g_server->xdg_activation = wlr_xdg_activation_v1_create(g_server->display);
@@ -574,6 +576,9 @@ cleanupServer()
    say(INFO, "Cleaning up Wayland server");
 
 #if XWAYLAND
+   wl_list_remove(&g_server->xwl_new_surface.link);
+   wl_list_remove(&g_server->xwl_ready.link);
+
    wlr_xwayland_destroy(g_server->xwayland);
    g_server->xwayland = NULL;
 #endif
@@ -589,6 +594,24 @@ cleanupServer()
    wl_list_remove(&g_server->output_layout_change.link);
    wl_list_remove(&g_server->output_manager_apply.link);
    wl_list_remove(&g_server->output_manager_test.link);
+
+   wl_list_remove(&g_server->request_activate.link);
+   wl_list_remove(&g_server->set_gamma.link);
+
+   wl_list_remove(&g_server->request_start_drag.link);
+   wl_list_remove(&g_server->start_drag.link);
+   wl_list_remove(&g_server->request_cursor.link);
+   wl_list_remove(&g_server->request_set_selection.link);
+   wl_list_remove(&g_server->request_set_primary_selection.link);
+
+   wl_list_remove(&g_server->new_pointer_constraint.link);
+
+   wl_list_remove(&g_server->layer_new_surface.link);
+
+   wl_list_remove(&g_server->new_inhibitor.link);
+   wl_list_remove(&g_server->output_pm_set_mode.link);
+
+   wl_list_remove(&g_server->new_decoration.link);
 
    wlr_xcursor_manager_destroy(g_server->cursor_manager);
    wlr_output_layout_destroy(g_server->output_layout);

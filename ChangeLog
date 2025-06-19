@@ -3,6 +3,10 @@ TODO
 	* : Code cleanup
 	* : Tags should be renamed to virtual workspace (vws)
 
+v0.4 -> v0.5 Changes
+2025-06-16
+	* meson.build: bump wlroots version from 0.18 to 0.19
+
 v0.3 -> v0.4 Changes
 2025-06-12
 	* include/output.h: add fixed_tag to fix a tag for an output 
