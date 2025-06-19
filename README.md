@@ -26,7 +26,7 @@ to teach myself the basics of window management.
 
 v0.1
 
-![Scrrenshot v0.1](.assets/ss_2024-01-18.png)
+![Scrrenshot v0.1](./assets/ss_2024-01-18.png)
 
 
 ### Usage
