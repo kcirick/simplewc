@@ -13,7 +13,7 @@ to teach myself the basics of window management.
    - No frills (menu, titlebar, icons, animations, pixmap themes, etc...)
    - Text config file (default $HOME/.config/simplewc/configrc)
    - Simple tiling (manual left-right or top-bottom tiling or one-shot auto-tile like DWL/DWM)
-   - ~~simplewc-msg: IPC messenger using dwl ipc protocol(dwl-ipc-unstable-v2.xml, adopted from [dwlmsg])~~
+   - Support dwl module for waybar via dwl-ipc-unstable protocol
 
 [wlroots]: https://gitlab.freedesktop.org/wlroots/wlroots
 [tinywl]: https://gitlab.freedesktop.org/wlroots/wlroots/-/tree/master/tinywl
@@ -85,8 +85,8 @@ Please use [Github Issues Tracker][ghit] to report bugs and issues.
     - Added visibility toggle (a.k.a. iconify) and maximize functionality
     - Added support for wlr_idle_notifier_v1, wlr_idle_inhibit_v1, and wlr_session_lock_manager_v1 (e.g. swaylock)
     - Added support for wlr_output_power_management_v1 (e.g. wlopm)
-    - Added support for wlr_gamma_control_manager_v1
-    - Added feature to send action via simplewc-msg
+    - ~~Added support for wlr_gamma_control_manager_v1~~ (Removed in version 0.5)
+    - ~~Added feature to send action via simplewc-msg~~ (Removed in version 0.4)
     - Added support for dragging icons
     - Improve client cycling function
     - See ChangeLog for fixed bugs

@@ -27,8 +27,6 @@ struct simple_output {
 
    struct wlr_box full_area;
    struct wlr_box usable_area;
-
-   bool gamma_lut_changed;
 };
 
 void new_output_notify(struct wl_listener *, void *); 

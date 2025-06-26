@@ -4,8 +4,11 @@ TODO
 	* : Tags should be renamed to virtual workspace (vws)
 
 v0.4 -> v0.5 Changes
-2025-06-16
-	* meson.build: bump wlroots version from 0.18 to 0.19
+2025-06-26
+	* meson.build: bump wlroots version from 0.18 to 0.19. Remove unused dependencies
+	* src/input.c: Fix a segfault from drag icon destroy
+	* src/output.c: remove wlr_gamma_control_v1
+	* src/server.c: remove wlr_gamma_control_v1
 
 v0.3 -> v0.4 Changes
 2025-06-12

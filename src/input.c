@@ -361,6 +361,7 @@ process_cursor_button(uint32_t time, struct wlr_input_device *device, uint32_t b
             if(test_output->wlr_output->enabled && test_output != client->output){
                client->output = test_output; 
                client->tag = g_server->current_tag;
+               return;
             }
          }
 
@@ -403,6 +404,8 @@ process_cursor_button(uint32_t time, struct wlr_input_device *device, uint32_t b
          }
          break;
    } // switch
+
+   wlr_seat_pointer_notify_button(g_server->seat, time, button, state);
 }
 
 //--- cursor notify functions --------------------------------------------
@@ -443,7 +446,7 @@ cursor_button_notify(struct wl_listener *listener, void *data)
 
    process_cursor_button(event->time_msec, &event->pointer->base, event->button, event->state);
 
-   wlr_seat_pointer_notify_button(g_server->seat, event->time_msec, event->button, event->state);
+   //wlr_seat_pointer_notify_button(g_server->seat, event->time_msec, event->button, event->state);
 }
 
 static void 
@@ -497,6 +500,8 @@ static void
 destroy_drag_icon_notify(struct wl_listener *listener, void *data)
 {
    focus_client(get_top_client_from_output(g_server->cur_output, false), true);
+   wl_list_remove(&listener->link);
+   //free(listener);
 }
 
 static void
@@ -815,8 +820,6 @@ new_input_notify(struct wl_listener *listener, void *data)
 
       struct wlr_tablet_pad *pad = wlr_tablet_pad_from_input_device(device);
       input->pad = pad;
-
-      //LISTEN(&pad->events.attach, &input->pad_
 
    } else {
       say(DEBUG, "New Input: SOMETHING ELSE");

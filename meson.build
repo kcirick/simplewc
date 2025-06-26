@@ -20,9 +20,8 @@ add_project_arguments(
 )
 
 #--- dependencies
-wlroots = dependency('wlroots-0.19', version: ['>=0.19.0', '<0.20.0'])
+wlroots = dependency('wlroots-0.19')
 wayland_server = dependency('wayland-server', version: '>=1.19.0')
-wayland_client = dependency('wayland-client', version: '>=1.19.0')
 wayland_proto = dependency('wayland-protocols')
 xkbcommon = dependency('xkbcommon')
 input = dependency('libinput', version: '>=1.14')
@@ -32,11 +31,6 @@ dependencies_server = [
   wayland_server,
   xkbcommon,
   input
-]
-
-dependencies_client = [
-  wlroots,
-  wayland_client,
 ]
 
 #--- optional dependencies
@@ -60,11 +54,6 @@ wlscanner_server_header = generator(
   output: '@BASENAME@-protocol.h',
   arguments: ['server-header', '@INPUT@', '@OUTPUT@']
 )
-#wlscanner_client_header = generator(
-#  wlscanner,
-#  output: '@BASENAME@-protocol.h',
-#  arguments: ['client-header', '@INPUT@', '@OUTPUT@']
-#)
 
 dwl_proto_files = []
 dwl_proto_files += wlscanner_code.process('protocols' / 'dwl-ipc-unstable-v2.xml')
@@ -79,12 +68,7 @@ wl_server_proto_files += wlscanner_server_header.process('protocols' / 'wlr-laye
 wl_server_proto_files += wlscanner_server_header.process('protocols' / 'dwl-ipc-unstable-v2.xml')
 wl_server_proto = declare_dependency( sources: wl_server_proto_files )
 
-#wl_client_proto_files = []
-#wl_client_proto_files += wlscanner_client_header.process('protocols' / 'dwl-ipc-unstable-v2.xml')
-#wl_client_proto = declare_dependency( sources: wl_client_proto_files )
-
 dependencies_server += [ dwl_proto, wl_server_proto ]
-#dependencies_client += [ dwl_proto, wl_client_proto ]
 
 #--- executables
 executable (

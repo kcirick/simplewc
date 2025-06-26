@@ -3,7 +3,6 @@
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_seat.h>
 
-#include <wlr/types/wlr_gamma_control_v1.h>
 #include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
@@ -99,26 +98,8 @@ output_frame_notify(struct wl_listener *listener, void *data)
    struct simple_output *output = wl_container_of(listener, output, frame);
    struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(g_server->scene, output->wlr_output);
    
-   struct wlr_gamma_control_v1 *gamma_control;
-   struct wlr_output_state pending = {0};
-   if (output->gamma_lut_changed) {
-      say(DEBUG, "gamma_lut_changed true");
-      gamma_control = wlr_gamma_control_manager_v1_get_control(g_server->gamma_control_manager, output->wlr_output);
-      output->gamma_lut_changed = false;
-
-      if(!wlr_gamma_control_v1_apply(gamma_control, &pending))
-         wlr_scene_output_commit(scene_output, NULL);
-
-      if(!wlr_output_test_state(output->wlr_output, &pending)) {
-         wlr_gamma_control_v1_send_failed_and_destroy(gamma_control);
-         wlr_scene_output_commit(scene_output, NULL);
-      }
-      wlr_output_commit_state(output->wlr_output, &pending);
-      wlr_output_schedule_frame(output->wlr_output);
-   } else {
-      // Render the scene if needed and commit the output 
-      wlr_scene_output_commit(scene_output, NULL);
-   }
+   // Render the scene if needed and commit the output 
+   wlr_scene_output_commit(scene_output, NULL);
    
    struct timespec now;
    clock_gettime(CLOCK_MONOTONIC, &now);
@@ -224,7 +205,7 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
       arrange_layers(output);
       arrange_outputs();
 
-      output->gamma_lut_changed = true;
+      //output->gamma_lut_changed = true;
       config_head->state.x = box.x;
       config_head->state.y = box.y;
    }

@@ -32,7 +32,6 @@
 #include <wlr/types/wlr_viewporter.h>
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
-#include <wlr/types/wlr_gamma_control_v1.h>
 #include <wlr/types/wlr_xdg_activation_v1.h>
 #include <wlr/types/wlr_tablet_v2.h>
 //#include <wlr/types/wlr_foreign_toplevel_management_v1.h>
@@ -235,17 +234,6 @@ output_pm_set_mode_notify(struct wl_listener *listener, void *data)
 }
 
 static void
-set_gamma_notify(struct wl_listener *listener, void *data)
-{
-   say(DEBUG, "set_gamma_notify");
-  
-   struct wlr_gamma_control_manager_v1_set_gamma_event *event = data;
-   struct simple_output *output = event->output->data;
-   output->gamma_lut_changed = true;
-   wlr_output_schedule_frame(output->wlr_output);
-}
-
-static void
 urgent_notify(struct wl_listener *listener, void *data)
 {
    say(DEBUG, "urgent_notify");
@@ -433,10 +421,6 @@ prepareServer()
    g_server->xdg_activation = wlr_xdg_activation_v1_create(g_server->display);
    LISTEN(&g_server->xdg_activation->events.request_activate, &g_server->request_activate, urgent_notify);
 
-   // gamma control manager
-   g_server->gamma_control_manager = wlr_gamma_control_manager_v1_create(g_server->display);
-   LISTEN(&g_server->gamma_control_manager->events.set_gamma, &g_server->set_gamma, set_gamma_notify);
-
    // create an output layout, i.e. wlroots utility for working with an arrangement of 
    // screens in a physical layout
    g_server->output_layout = wlr_output_layout_create(g_server->display);
@@ -596,7 +580,6 @@ cleanupServer()
    wl_list_remove(&g_server->output_manager_test.link);
 
    wl_list_remove(&g_server->request_activate.link);
-   wl_list_remove(&g_server->set_gamma.link);
 
    wl_list_remove(&g_server->request_start_drag.link);
    wl_list_remove(&g_server->start_drag.link);
