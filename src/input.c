@@ -742,7 +742,7 @@ input_destroy_notify(struct wl_listener *listener, void *data)
          if(test_input==input) continue;
          if(test_input->device->type==WLR_INPUT_DEVICE_KEYBOARD) break;
       }
-      if(test_input)
+      if(test_input && test_input->keyboard->keymap_string != 0x0)
          wlr_seat_set_keyboard(g_server->seat, test_input->keyboard);
    }
    wl_list_remove(&input->destroy.link);

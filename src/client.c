@@ -496,6 +496,9 @@ focus_client(struct simple_client *client, bool raise)
    if(client->type != XWL_UNMANAGED_CLIENT)
       set_client_border_colour(client, FOCUSED);
    
+   // set fullscreen layer
+   wlr_scene_node_set_enabled(&client->output->fullscreen_bg->node, client->fullscreen);
+
    input_focus_surface(surface);
 
    // only call when raised
@@ -655,9 +658,13 @@ unmap_notify(struct wl_listener *listener, void *data)
    if(client->type==XWL_UNMANAGED_CLIENT){
       if(client->xwl_surface->surface == g_server->seat->keyboard_state.focused_surface)
          focus_client(get_top_client_from_output(g_server->cur_output, false), true);
-   } else
+   } else {
 #endif
       wl_list_remove(&client->link);
+      focus_client(get_top_client_from_output(g_server->cur_output, false), true);
+#if XWAYLAND
+   }
+#endif
 
    if(client->scene_tree)
       wlr_scene_node_destroy(&client->scene_tree->node);

@@ -21,11 +21,13 @@ arrange_outputs()
 {
    say(DEBUG, "arrange_outputs");
    struct simple_client* client, *focused_client=NULL;
+   struct simple_output* test_output;
 
    get_client_from_surface(g_server->seat->keyboard_state.focused_surface, &focused_client, NULL);
    
-   if(focused_client)
-      wlr_scene_node_set_enabled(&focused_client->output->fullscreen_bg->node, focused_client->fullscreen);
+   // reset fullscreen_bg for each outputs
+   wl_list_for_each(test_output, &g_server->outputs, link)
+      wlr_scene_node_set_enabled(&test_output->fullscreen_bg->node, 0);
 
    int n=0;
    bool is_client_visible=false;
@@ -205,7 +207,6 @@ output_layout_change_notify(struct wl_listener *listener, void *data)
       arrange_layers(output);
       arrange_outputs();
 
-      //output->gamma_lut_changed = true;
       config_head->state.x = box.x;
       config_head->state.y = box.y;
    }

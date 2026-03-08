@@ -4,6 +4,10 @@ TODO
 	* : Tags should be renamed to virtual workspace (vws)
 
 v0.4 -> v0.5 Changes
+2025-06-27
+	* src/output.c: resets the fullscreen layer on tag change
+	* src/client.c: focus the next client when current client is unmapped
+
 2025-06-26
 	* meson.build: bump wlroots version from 0.18 to 0.19. Remove unused dependencies
 	* src/input.c: Fix a segfault from drag icon destroy

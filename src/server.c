@@ -511,7 +511,6 @@ prepareServer()
    g_server->current_tag = TAGMASK(0);
    g_server->visible_tags = TAGMASK(0);
 
-
    // Set up IPC interface
    wl_global_create(g_server->display, &zdwl_ipc_manager_v2_interface, DWL_IPC_VERSION, NULL, ipc_manager_bind);
 
@@ -533,12 +532,12 @@ startServer()
 
    const char* socket = wl_display_add_socket_auto(g_server->display);
    if(!socket){
-      cleanupServer(g_server);
+      cleanupServer();
       say(ERROR, "Unable to add socket to Wayland display!");
    }
 
    if(!wlr_backend_start(g_server->backend)){
-      cleanupServer(g_server);
+      cleanupServer();
       say(ERROR, "Unable to start WLR backend!");
    }
    
